@@ -1,0 +1,39 @@
+{
+  "name": "soul-dublers",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sistema de cadastro e classificação de dubladores da comunidade Soul Dublers",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w apps/web",
+    "dev:bot": "npm run dev -w apps/bot",
+    "bot:register": "npm run register -w apps/bot",
+    "build": "npm run build -w apps/web && npm run build -w apps/bot",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w apps/web && npm run typecheck -w apps/bot",
+    "lint": "eslint .",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "^26.6.5",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "jsdom": "^30.1.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
+  },
+  "type": "module"
+}
