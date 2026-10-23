@@ -1,0 +1,12 @@
+# Runtime
+runtime: node
+nodeVersion: 20
+
+# Build
+buildCommand: npm install && npm run build -w apps/bot
+startCommand: node apps/bot/dist/index.js
+
+# Env vars (add in Render dashboard):
+# BOT_TOKEN=<seu_token>
+# CLIENT_ID=<seu_client_id>
+# GUILD_ID=<seu_servidor>
