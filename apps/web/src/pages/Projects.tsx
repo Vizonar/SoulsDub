@@ -5,7 +5,21 @@ import { useApp } from '../lib/app-context.js';
 
 export function Projects() {
   const { repo, actor } = useApp();
-  const [projects, setProjects] = useState([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [newTitle, setNewTitle] = useState('');
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    try {
+    const { data, error } = await (repo as any).db.from('projects').insert({ title: newTitle.trim(), status: 'planejamento' }).select('*').single();
+      if (error) { alert('Erro: ' + error.message); return; }
+      setProjects(prev => [...prev, data]);
+      setNewTitle('');
+    } catch (err) {
+      alert('Erro ao criar projeto. Verifique se a tabela projects existe no Supabase.');
+    }
+  };
   
   return (
     <div className="space-y-6">
@@ -33,8 +47,8 @@ export function Projects() {
       </Panel>
 
       <Panel title="Criar Projeto">
-        <form onSubmit={e => { e.preventDefault(); alert('Projeto criado (mock)'); }} className="flex gap-2">
-          <input placeholder="Nome do projeto..." className="flex-1 bg-void border border-accent-glow/30 rounded-xl px-3 py-2 text-xs text-accent-light placeholder:text-accent-neon/40 focus:border-accent-glow" />
+        <form onSubmit={handleCreate} className="flex gap-2">
+          <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Nome do projeto..." className="flex-1 bg-void border border-accent-glow/30 rounded-xl px-3 py-2 text-xs text-accent-light placeholder:text-accent-neon/40 focus:border-accent-glow" />
           <Btn type="submit">Criar</Btn>
         </form>
       </Panel>
