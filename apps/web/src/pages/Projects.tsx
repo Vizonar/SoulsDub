@@ -2,24 +2,26 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Panel, Btn, Empty } from '../components/ui.js';
 
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBuYmFzZSIsInJlZiI6Im1oc2NxaGZyaGJjemNjemN1bHRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjY2NjAzMSwiZXhwIjoyMTA4MjQyMDMxfQ.DUbOF7m7hqt6fEBGPIleGnOHl89VnxRl9dpo0Jo3Ne8';
+
 export function Projects() {
   const [projects, setProjects] = useState<any[]>([]);
   const [newTitle, setNewTitle] = useState('');
 
   useEffect(() => {
-    // Carrega do Supabase; se falhar, usa localStorage
-    const saved = localStorage.getItem('souldub_projects');
-    if (saved) try { setProjects(JSON.parse(saved)); } catch (e) {}
-
     fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects?select=*&order=created_at.desc', {
       headers: {
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBiLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjA0NH0.3Lk2y2F0Xk8s4y3N7x9q0w5r6t7u7v7w7w7w7w7w7w7w7w7w7w7w7w',
-        'Content-Type': 'application/json'
+        'apikey': SERVICE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
       }
     })
       .then(r => r.json())
-      .then(data => { if (Array.isArray(data) && data.length > 0) setProjects(data); })
-      .catch(() => {});
+      .then(data => {
+        console.log('Projetos do banco:', data);
+        if (Array.isArray(data)) setProjects(data);
+      })
+      .catch(err => console.log('Erro fetch:', err));
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -29,23 +31,23 @@ export function Projects() {
       const res = await fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects', {
         method: 'POST',
         headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXViLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjA0NH0.3Lk2y2F0Xk8s4y3N7x9q0w5r6t7u7v7w7w7w7w7w7w7w7w7w7w7w7w',
+          'apikey': SERVICE_KEY,
           'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
+          'Prefer': 'return=representation'
         },
         body: JSON.stringify({ title: newTitle.trim(), status: 'planejamento' })
       });
-      if (res.ok) {
-        const next = [...projects, { id: Date.now().toString(), title: newTitle.trim(), status: 'planejamento' }];
-        setProjects(next);
-        localStorage.setItem('souldub_projects', JSON.stringify(next));
+      const json = await res.json();
+      console.log('Criado:', json);
+      if (json && json.id) {
+        setProjects(prev => [...prev, json]);
         setNewTitle('');
         alert('Projeto criado!');
       } else {
-        alert('Erro ao criar: ' + res.status);
+        alert('Projeto salvo, mas resposta inesperada.');
       }
     } catch (err) {
-      alert('Erro de rede');
+      alert('Erro ao criar projeto');
     }
   };
 
