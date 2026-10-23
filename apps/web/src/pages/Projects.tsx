@@ -7,13 +7,6 @@ export function Projects() {
   const { repo, actor } = useApp();
   const [projects, setProjects] = useState([]);
   
-  // Mock projects para demonstração do design
-  const demoProjects = [
-    { id: 'p1', title: 'Cyberpunk Ep 01', status: 'em_andamento', chars: 4 },
-    { id: 'p2', title: 'Anime Shonen — Arco Fantasma', status: 'planejamento', chars: 0 },
-    { id: 'p3', title: 'Game Ação — Capítulo 3', status: 'finalizado', chars: 6 },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
@@ -23,15 +16,19 @@ export function Projects() {
 
       <Panel title="Projetos Ativos">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {demoProjects.map(p => (
-            <Link key={p.id} to={`/projetos/${p.id}`} className="neon-card rounded-xl p-4 block hover:border-accent-glow/60 transition-colors">
-              <h3 className="font-display text-xl text-white">{p.title}</h3>
-              <div className="flex justify-between items-center mt-3 text-xs font-tech">
-                <span className="text-accent-neon bg-accent-deep/40 px-2 py-0.5 rounded">{p.status}</span>
-                <span className="text-purple-300/60">{p.chars} papéis</span>
-              </div>
-            </Link>
-          ))}
+          {projects.length === 0 ? (
+            <Empty>Nenhum projeto cadastrado ainda.</Empty>
+          ) : (
+            projects.map((p: any) => (
+              <Link key={p.id} to={`/projetos/${p.id}`} className="neon-card rounded-xl p-4 block hover:border-accent-glow/60 transition-colors">
+                <h3 className="font-display text-xl text-white">{p.title}</h3>
+                <div className="flex justify-between items-center mt-3 text-xs font-tech">
+                  <span className="text-accent-neon bg-accent-deep/40 px-2 py-0.5 rounded">{p.status}</span>
+                  <span className="text-purple-300/60">{p.chars || 0} papéis</span>
+                </div>
+              </Link>
+            ))
+          )}
         </div>
       </Panel>
 
