@@ -2,7 +2,8 @@ app = "tender-snowflake-8461"
 primary_region = "gru"
 
 [build]
-dockerfile = "Dockerfile"
+builder = "paketobuildpacks/builder:base"
+buildpacks = ["paketobuildpacks/nodejs"]
 
 [env]
 BOT_STORAGE = "supabase"
