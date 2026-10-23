@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Panel, Btn, Empty, Loading } from '../components/ui.js';
 import { useApp } from '../lib/app-context.js';
@@ -7,6 +7,17 @@ export function Projects() {
   const { repo, actor } = useApp();
   const [projects, setProjects] = useState<any[]>([]);
   const [newTitle, setNewTitle] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const db = (repo as any)?.db;
+        if (!db) return;
+        const { data, error } = await db.from('projects').select('*').order('created_at', { ascending: false });
+        if (!error && data) setProjects(data);
+      } catch (e) {}
+    })();
+  }, [repo]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
