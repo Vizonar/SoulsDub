@@ -6,6 +6,7 @@ import { ErrorBox } from './components/ui.js';
 import { AppProvider } from './lib/app-context.js';
 import { parseEnv } from './lib/env.js';
 import { createBackend, type AppBackend } from './lib/repository-factory.js';
+import { Projects } from './pages/Projects.js';
 import { Activity } from './pages/Activity.js';
 import { Dashboard } from './pages/Dashboard.js';
 import { Directory } from './pages/Directory.js';
@@ -18,6 +19,7 @@ function Shell() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/dubladores/:id?" element={<Directory />} />
+        <Route path="/projetos/:id?" element={<Projects />} />
         <Route path="/avaliacoes" element={<Reviews />} />
         <Route path="/atividade" element={<Activity />} />
         <Route path="*" element={<Dashboard />} />

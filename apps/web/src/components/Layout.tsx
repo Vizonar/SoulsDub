@@ -14,6 +14,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <nav className="flex flex-col gap-1" onClick={() => setOpen(false)} aria-label="Principal">
       <NavLink to="/" end className={link}>Dashboard</NavLink>
       <NavLink to="/dubladores" className={link}>Dubladores</NavLink>
+      <NavLink to="/projetos" className={link}>Projetos</NavLink>
       <NavLink to="/avaliacoes" className={link}>Avaliações</NavLink>
       {can(actor.role, 'audit.read') && <NavLink to="/atividade" className={link}>Atividade</NavLink>}
     </nav>
