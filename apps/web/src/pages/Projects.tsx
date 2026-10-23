@@ -7,9 +7,8 @@ export function Projects() {
   const [newTitle, setNewTitle] = useState('');
 
   useEffect(() => {
-    const u = new URL('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects?select=*&order=created_at.desc');
-    fetch(u.toString(), { headers: { 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oc2NxaGZyaGJjemNjemN1bHRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjA0NH0.3Lk2y2F0Xk8s4y3N7x9q0w5r6t7u7v7w7w7w7w7w7w7w7w7w7w7w7w7w', 'Content-Type': 'application/json' } })
-      .then(r => r.json()).then(data => { if (Array.isArray(data)) setProjects(data); }).catch(() => {});
+    const saved = localStorage.getItem('souldub_projects');
+    if (saved) try { setProjects(JSON.parse(saved)); } catch (e) {}
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -22,7 +21,7 @@ export function Projects() {
         body: JSON.stringify({ title: newTitle.trim(), status: 'planejamento' })
       });
       if (res.ok) {
-        setProjects(prev => [...prev, { id: Date.now().toString(), title: newTitle.trim(), status: 'planejamento' }]);
+        setProjects(prev => { const next = [...prev, { id: Date.now().toString(), title: newTitle.trim(), status: 'planejamento' }]; localStorage.setItem('souldub_projects', JSON.stringify(next)); return next; });
         setNewTitle('');
         alert('Projeto criado!');
       } else {
