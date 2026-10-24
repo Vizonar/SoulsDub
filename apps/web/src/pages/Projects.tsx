@@ -1,55 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Panel, Btn, Empty } from '../components/ui.js';
-
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBuYmFzZSIsInJlZiI6Im1oc2NxaGZyaGJjemNjemN1bHRmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjY2NjAzMSwiZXhwIjoyMTA4MjQyMDMxfQ.DUbOF7m7hqt6fEBGPIleGnOHl89VnxRl9dpo0Jo3Ne8';
+import { useApp } from '../lib/app-context.js';
 
 export function Projects() {
+  const { supabase } = useApp() as any;
   const [projects, setProjects] = useState<any[]>([]);
   const [newTitle, setNewTitle] = useState('');
 
   useEffect(() => {
-    fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects?select=*&order=created_at.desc', {
-      headers: {
-        'apikey': SERVICE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      }
-    })
-      .then(r => r.json())
-      .then(data => {
-        console.log('Projetos do banco:', data);
-        if (Array.isArray(data)) setProjects(data);
-      })
-      .catch(err => console.log('Erro fetch:', err));
-  }, []);
+    if (!supabase) return;
+    supabase.from('projects').select('*').order('created_at', { ascending: false }).then(({ data, error }: any) => {
+      if (!error && data) setProjects(data);
+    });
+  }, [supabase]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
-    try {
-      const res = await fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects', {
-        method: 'POST',
-        headers: {
-          'apikey': SERVICE_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify({ title: newTitle.trim(), status: 'planejamento' })
-      });
-      const json = await res.json();
-      console.log('Criado:', json);
-      const created = Array.isArray(json) ? json[0] : json;
-      if (created && created.id) {
-        setProjects(prev => [...prev, created]);
-        setNewTitle('');
-        alert('Projeto criado!');
-      } else {
-        alert('Projeto salvo, mas resposta inesperada.');
-      }
-    } catch (err) {
-      alert('Erro ao criar projeto');
-    }
+    if (!newTitle.trim() || !supabase) return;
+    const { data, error } = await supabase.from('projects').insert({ title: newTitle.trim(), status: 'planejamento' }).select('*').single();
+    if (error) { alert('Erro ao criar: ' + error.message); return; }
+    if (data) { setProjects(prev => [...prev, data]); setNewTitle(''); alert('Projeto criado!'); }
   };
 
   return (
