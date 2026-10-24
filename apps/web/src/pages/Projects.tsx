@@ -18,8 +18,9 @@ export function Projects() {
     })
       .then(r => r.json())
       .then(data => {
-        console.log('Projetos do banco:', data);
-        if (Array.isArray(data)) setProjects(data);
+        console.log('Projetos do banco:', JSON.stringify(data));
+        const arr = Array.isArray(data) ? data : (data && Array.isArray(data.data)) ? data.data : [];
+        if (arr.length > 0) setProjects(arr);
       })
       .catch(err => console.log('Erro fetch:', err.message || err));
   }, []);
