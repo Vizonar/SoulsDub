@@ -4,6 +4,7 @@ import type { Actor, DubberRepository } from '@soul/shared';
 export interface AppState {
   mode: 'demo' | 'production';
   repo: DubberRepository;
+  supabase?: any;
   actor: Actor;
   /** Incrementa a cada alteração, para as telas recarregarem. */
   version: number;

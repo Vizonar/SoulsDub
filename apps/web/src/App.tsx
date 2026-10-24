@@ -46,7 +46,7 @@ function ProductionApp({ backend }: { backend: Extract<AppBackend, { kind: 'prod
   if (!session) return <LoginScreen supabase={backend.supabase} />;
   if (!staff.data) return <NoAccess onSignOut={signOut} error={staff.error} />;
   return (
-    <AppProvider mode="production" repo={backend.repo} actor={staff.data} signOut={signOut}>
+    <AppProvider mode="production" repo={backend.repo} supabase={backend.supabase} actor={staff.data} signOut={signOut}>
       <HashRouter><Shell /></HashRouter>
     </AppProvider>
   );
@@ -54,6 +54,7 @@ function ProductionApp({ backend }: { backend: Extract<AppBackend, { kind: 'prod
 
 export default function App() {
   const backend = useMemo(() => createBackend(parseEnv(import.meta.env as Record<string, string | undefined>)), []);
+  
   if (backend.kind === 'misconfigured') {
     return (
       <div className="mx-auto max-w-xl space-y-3 p-8">
