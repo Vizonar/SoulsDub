@@ -21,7 +21,7 @@ export function Projects() {
         console.log('Projetos do banco:', data);
         if (Array.isArray(data)) setProjects(data);
       })
-      .catch(err => console.log('Erro fetch:', err));
+      .catch(err => console.log('Erro fetch:', err.message || err));
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
