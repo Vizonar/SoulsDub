@@ -39,8 +39,9 @@ export function Projects() {
       });
       const json = await res.json();
       console.log('Criado:', json);
-      if (json && json.id) {
-        setProjects(prev => [...prev, json]);
+      const created = Array.isArray(json) ? json[0] : json;
+      if (created && created.id) {
+        setProjects(prev => [...prev, created]);
         setNewTitle('');
         alert('Projeto criado!');
       } else {
