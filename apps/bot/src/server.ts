@@ -7,7 +7,7 @@ import { config as loadDotenv } from 'dotenv';
 loadDotenv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
 
 const app = express();
-app.use(cors({ origin: ['https://Vizonar.github.io', 'http://localhost:5173', 'http://localhost:3080'], credentials: true }));
+app.use(cors({ origin: ['https://Vizonar.github.io', 'http://localhost:5173', 'http://localhost:3080', 'https://soulsdub-1.onrender.com'], credentials: true }));
 app.use(express.json());
 
 const supabase = createClient(

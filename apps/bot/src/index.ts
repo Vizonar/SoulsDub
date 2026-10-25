@@ -37,6 +37,9 @@ async function main() {
   client.on(Events.InteractionCreate, (i) => void routeInteraction(i, { repo, store, config, client }));
   setInterval(() => store.sweep(Date.now()), 5 * 60 * 1000).unref();
   await client.login(config.token);
+
+  // Proxy REST para o site (não expõe chave no navegador)
+  import('./server.js');
 }
 
 void main();
