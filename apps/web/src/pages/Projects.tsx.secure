@@ -1,0 +1,5 @@
+// Solução segura: não embutir chave secreta no front-end.
+// Opção A: usar chave anon + RLS pública (já configurado no .env)
+// Opção B: criar endpoint /api/projetos no bot (não expõe chave)
+// Opção C: build local sem push (arquivo assets/ apenas local)
+export const SERVICE_KEY = 'sb_publishable_Azt_bZwC2uhqVGUnrRhi6g_dXLs9nJ4'; // chave anon pública
