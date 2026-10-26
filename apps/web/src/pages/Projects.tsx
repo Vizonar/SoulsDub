@@ -22,7 +22,13 @@ export function Projects() {
   }
 
   useEffect(() => {
-    fetch('https://soulsdub-1.onrender.com/api/projetos')
+    fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects?select=*&order=created_at.desc', {
+      headers: {
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub24iLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjAzMX0.FNoQ2pGSc3RJ5OonG_rnrnsOEw9cVZpKaRcHlcbUWwQ',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      }
+    })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setProjects(data);
@@ -34,9 +40,13 @@ export function Projects() {
     e.preventDefault();
     if (!newTitle.trim()) return;
     try {
-      const res = await fetch('https://soulsdub-1.onrender.com/api/projetos', {
+      const res = await fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub24iLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjAzMX0.FNoQ2pGSc3RJ5OonG_rnrnsOEw9cVZpKaRcHlcbUWwQ',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
         body: JSON.stringify({ title: newTitle.trim(), status: 'planejamento' })
       });
       const json = await res.json();
