@@ -22,9 +22,9 @@ export function Projects() {
   }
 
   useEffect(() => {
-    fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects?select=*&order=created_at.desc', {
+    fetch('https://lcjepclnwriteprfmepu.supabase.co/rest/v1/projects?select=*&order=created_at.desc', {
       headers: {
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub24iLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjAzMX0.FNoQ2pGSc3RJ5OonG_rnrnsOEw9cVZpKaRcHlcbUWwQ',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjamVwY2xubnZlcHJmd2ZtcGVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwMzExMDMsImV4cCI6MjEwODYwNzEwM30.3kbtiK9pjl5M3DMn3Gf3JFQ9kf8ER7EZWCfJ79q8Izc',
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       }
@@ -40,10 +40,10 @@ export function Projects() {
     e.preventDefault();
     if (!newTitle.trim()) return;
     try {
-      const res = await fetch('https://mhscqhfrhbczcczcultf.supabase.co/rest/v1/projects', {
+      const res = await fetch('https://lcjepclnwriteprfmepu.supabase.co/rest/v1/projects', {
         method: 'POST',
         headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub24iLCJpYXQiOjE3OTI2NjYwMzEsImV4cCI6MjEwODI0MjAzMX0.FNoQ2pGSc3RJ5OonG_rnrnsOEw9cVZpKaRcHlcbUWwQ',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxjamVwY2xubnZlcHJmd2ZtcGVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwMzExMDMsImV4cCI6MjEwODYwNzEwM30.3kbtiK9pjl5M3DMn3Gf3JFQ9kf8ER7EZWCfJ79q8Izc',
           'Content-Type': 'application/json',
           'Prefer': 'return=representation'
         },
