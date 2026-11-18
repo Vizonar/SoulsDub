@@ -137,3 +137,24 @@ audio { width: 100%; height: 38px; }
 .publico-head { margin-bottom: 1.5rem; }
 .publico-head h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.02em; }
 .linklike { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-align: left; text-decoration: underline; }
+
+/* ---- acordeao de episodios ---- */
+.ep-item { border: 1px solid #ffffff14; border-radius: 10px; overflow: hidden; }
+.ep-head { display: flex; }
+.ep-toggle {
+  flex: 1; display: flex; align-items: center; gap: .55rem; width: 100%;
+  background: none; border: 0; color: inherit; cursor: pointer;
+  padding: .7rem .85rem; text-align: left; font: inherit;
+}
+.ep-toggle:hover { background: #ffffff08; }
+.ep-chevron { color: var(--muted); width: 1rem; display: inline-block; }
+.ep-body { padding: .25rem .85rem 1rem; border-top: 1px solid #ffffff10; }
+.badge.planejamento { background: #a78bfa26; color: var(--accent); }
+.badge.roteiro_pronto { background: #60a5fa26; color: #60a5fa; }
+.badge.gravando { background: #fbbf241f; color: var(--warn); }
+.badge.mixando { background: #f472b626; color: #f472b6; }
+.badge.concluido { background: #34d39926; color: var(--ok); }
+.badge.em_producao { background: #fbbf241f; color: var(--warn); }
+.badge.pronto { background: #34d39926; color: var(--ok); }
+.badge.finalizado { background: #ffffff14; color: var(--muted); }
+.badge.nao_iniciado { background: #60a5fa26; color: #60a5fa; }

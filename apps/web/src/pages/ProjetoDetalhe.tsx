@@ -31,6 +31,7 @@ export default function ProjetoDetalhe() {
   const [castCharacter, setCastCharacter] = useState('');
   const [busy, setBusy] = useState(false);
   const [scriptEdit, setScriptEdit] = useState<{ id: string; text: string } | null>(null);
+  const [epAberto, setEpAberto] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -206,58 +207,81 @@ export default function ProjetoDetalhe() {
       <section className="card stack">
         <h3>Episódios ({episodios.length})</h3>
 
-        {episodios.map((ep) => (
-          <div key={ep.id} className="stack">
-            <div className="row space wrap gap">
-              <strong>{ep.title}</strong>
-              <select
-                className="select"
-                value={ep.status}
-                disabled={busy}
-                onChange={(e) => void mudarStatusEp(ep, e.target.value as EpisodeStatus)}
-              >
-                {EPISODE_STATUS_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {EPISODE_STATUS_LABEL[s]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {scriptEdit?.id === ep.id ? (
-              <div className="stack">
-                <textarea
-                  className="search"
-                  rows={10}
-                  value={scriptEdit.text}
-                  onChange={(e) => setScriptEdit({ id: ep.id, text: e.target.value })}
-                />
-                <div className="row gap">
-                  <button className="btn primary small" disabled={busy} onClick={() => void salvarRoteiro(ep)}>
-                    Salvar roteiro
-                  </button>
-                  <button className="btn ghost small" onClick={() => setScriptEdit(null)}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="stack">
-                <p className="muted small">
-                  {ep.script ? `${ep.script.slice(0, 160)}${ep.script.length > 160 ? '…' : ''}` : 'Sem roteiro escrito.'}
-                </p>
+        {episodios.map((ep) => {
+          const aberto = epAberto === ep.id;
+          return (
+            <div key={ep.id} className="ep-item">
+              <div className="ep-head">
                 <button
-                  className="btn ghost small"
-                  onClick={() => setScriptEdit({ id: ep.id, text: ep.script ?? '' })}
+                  type="button"
+                  className="ep-toggle"
+                  aria-expanded={aberto}
+                  onClick={() => setEpAberto(aberto ? null : ep.id)}
                 >
-                  {ep.script ? 'Editar roteiro' : 'Escrever roteiro'}
+                  <span className="ep-chevron">{aberto ? '▾' : '▸'}</span>
+                  <strong>{ep.title}</strong>
+                  <span className={`badge ${ep.status}`}>{EPISODE_STATUS_LABEL[ep.status] ?? ep.status}</span>
+                  {ep.script && <span className="muted tiny">· roteiro</span>}
                 </button>
               </div>
-            )}
 
-            <EpisodioDetalhe episode={ep} elenco={elenco} />
-          </div>
-        ))}
+              {aberto && (
+                <div className="ep-body stack">
+                  <div className="row space wrap gap">
+                    <label className="muted small">Status do episódio</label>
+                    <select
+                      className="select"
+                      value={ep.status}
+                      disabled={busy}
+                      onChange={(e) => void mudarStatusEp(ep, e.target.value as EpisodeStatus)}
+                    >
+                      {EPISODE_STATUS_ORDER.map((s) => (
+                        <option key={s} value={s}>
+                          {EPISODE_STATUS_LABEL[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {scriptEdit?.id === ep.id ? (
+                    <div className="stack">
+                      <textarea
+                        className="search"
+                        rows={10}
+                        value={scriptEdit.text}
+                        onChange={(e) => setScriptEdit({ id: ep.id, text: e.target.value })}
+                      />
+                      <div className="row gap">
+                        <button className="btn primary small" disabled={busy} onClick={() => void salvarRoteiro(ep)}>
+                          Salvar roteiro
+                        </button>
+                        <button className="btn ghost small" onClick={() => setScriptEdit(null)}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="stack">
+                      <p className="muted small">
+                        {ep.script
+                          ? `${ep.script.slice(0, 160)}${ep.script.length > 160 ? '…' : ''}`
+                          : 'Sem roteiro escrito.'}
+                      </p>
+                      <button
+                        className="btn ghost small"
+                        onClick={() => setScriptEdit({ id: ep.id, text: ep.script ?? '' })}
+                      >
+                        {ep.script ? 'Editar roteiro' : 'Escrever roteiro'}
+                      </button>
+                    </div>
+                  )}
+
+                  <EpisodioDetalhe episode={ep} elenco={elenco} />
+                </div>
+              )}
+            </div>
+          );
+        })}
         {!episodios.length && <p className="muted small">Nenhum episódio cadastrado ainda.</p>}
 
         <form className="row gap wrap" onSubmit={criarEpisodio}>
