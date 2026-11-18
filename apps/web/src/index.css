@@ -131,3 +131,9 @@ audio { width: 100%; height: 38px; }
   .sidebar-foot { margin: 0 0 0 auto; flex-direction: row; align-items: center; }
   .kv { grid-template-columns: 1fr; }
 }
+
+/* ---- area publica (catalogo de dubladores) ---- */
+.publico { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+.publico-head { margin-bottom: 1.5rem; }
+.publico-head h1 { margin: 0 0 .25rem; font-size: 1.9rem; letter-spacing: -.02em; }
+.linklike { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-align: left; text-decoration: underline; }

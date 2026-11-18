@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import EpisodioDetalhe from '../components/EpisodioDetalhe';
 import {
   EPISODE_STATUS_LABEL,
   PROJECT_STATUS_LABEL,
@@ -253,6 +254,8 @@ export default function ProjetoDetalhe() {
                 </button>
               </div>
             )}
+
+            <EpisodioDetalhe episode={ep} elenco={elenco} />
           </div>
         ))}
         {!episodios.length && <p className="muted small">Nenhum episódio cadastrado ainda.</p>}

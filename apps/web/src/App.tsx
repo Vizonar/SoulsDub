@@ -5,6 +5,7 @@ import Fichas from './pages/Fichas';
 import FichaDetalhe from './pages/FichaDetalhe';
 import Projetos from './pages/Projetos';
 import ProjetoDetalhe from './pages/ProjetoDetalhe';
+import { DubladorPublico, DubladoresPublicos } from './pages/DubladorPublico';
 
 function Layout() {
   const { user, logout } = useAuth();
@@ -54,6 +55,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/dubladores" element={<DubladoresPublicos />} />
+          <Route path="/dubladores/:slug" element={<DubladorPublico />} />
           <Route element={<Private />}>
             <Route path="/fichas" element={<Fichas />} />
             <Route path="/fichas/:id" element={<FichaDetalhe />} />

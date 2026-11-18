@@ -131,6 +131,14 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
 
   const param = (req: express.Request, name: string): string => String((req.params as Record<string, string>)[name] ?? '');
 
+  /** Registro de auditoria (usado pelas áreas de amostras, projetos e episódios). */
+  const logProject = async (actor: Actor, action: string, entity: string, entityId: string, details?: Record<string, unknown>) => {
+    await pool.query(
+      `INSERT INTO audit_log (actor_id, actor_name, action, entity, entity_id, details) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [actor.id, actor.name, action, entity, entityId, details ? JSON.stringify(details) : null],
+    );
+  };
+
   // ---------- saúde ----------
   app.get('/api/health', wrap(async (_req, res) => {
     const { rows } = await pool.query<{ now: Date }>('SELECT now() AS now');
@@ -186,6 +194,27 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
 
   app.get('/api/fichas/:id', requireActor(async (actor, req, res) => {
     res.json(await repo.getDetails(actor, param(req, 'id')));
+  }));
+
+  // Amostras com o status de aprovação (usado pela tela da ficha).
+  app.get('/api/fichas/:id/amostras', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query(
+      `SELECT id, dubber_id, file_name, mime_type, size_bytes, label, source, uploaded_by_name,
+              created_at, review_status, review_note, reviewed_by, reviewed_at
+         FROM samples WHERE dubber_id = $1 ORDER BY created_at DESC`,
+      [param(req, 'id')],
+    );
+    res.json(rows);
+  }));
+
+  // Publicação da ficha (estado atual)
+  app.get('/api/fichas/:id/publicacao', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query('SELECT is_public, public_slug FROM dubbers WHERE id = $1', [param(req, 'id')]);
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Ficha não encontrada.' });
+      return;
+    }
+    res.json(rows[0]);
   }));
 
   app.patch('/api/fichas/:id', requireActor(async (actor, req, res) => {
@@ -249,6 +278,27 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
     res.json({ ok: true });
   }));
 
+  // Aprovação de amostra de voz (pendente / aprovada / recusada)
+  app.post('/api/samples/:id/aprovacao', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { status?: unknown; note?: unknown };
+    const status = asString(body.status);
+    if (!status || !['pendente', 'aprovada', 'recusada'].includes(status)) {
+      res.status(400).json({ error: 'Status inválido.' });
+      return;
+    }
+    const { rows } = await pool.query(
+      `UPDATE samples SET review_status = $2, review_note = $3, reviewed_by = $4, reviewed_at = now()
+       WHERE id = $1 RETURNING dubber_id`,
+      [param(req, 'id'), status, asString(body.note) ?? null, actor.name],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Amostra não encontrada.' });
+      return;
+    }
+    await logProject(actor, 'sample.reviewed', 'dubber', rows[0].dubber_id, { status });
+    res.json({ ok: true });
+  }));
+
   // Áudio servido pelo próprio backend (bytes no Postgres), sempre autenticado.
   app.get('/api/samples/:id/audio', requireActor(async (_actor, req, res) => {
     const sampleRepo = repo as SampleBytesRepository;
@@ -269,13 +319,6 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
   }));
 
   // ---------- projetos ----------
-  const logProject = async (actor: Actor, action: string, entity: string, entityId: string, details?: Record<string, unknown>) => {
-    await pool.query(
-      `INSERT INTO audit_log (actor_id, actor_name, action, entity, entity_id, details) VALUES ($1,$2,$3,$4,$5,$6)`,
-      [actor.id, actor.name, action, entity, entityId, details ? JSON.stringify(details) : null],
-    );
-  };
-
   app.get('/api/projetos', requireActor(async (_actor, _req, res) => {
     const { rows } = await pool.query('SELECT * FROM projects ORDER BY created_at DESC');
     res.json(rows);
@@ -390,6 +433,247 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
     }
     await logProject(actor, 'cast.removed', 'project', rows[0].project_id);
     res.json({ ok: true });
+  }));
+
+  // ---------- falas do roteiro (por personagem) ----------
+  app.get('/api/episodios/:id/falas', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query(
+      `SELECT * FROM episode_lines WHERE episode_id = $1 ORDER BY line_number ASC, created_at ASC`,
+      [param(req, 'id')],
+    );
+    res.json(rows);
+  }));
+
+  app.post('/api/episodios/:id/falas', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { characterName?: unknown; text?: unknown; context?: unknown };
+    const characterName = asString(body.characterName);
+    const text = asString(body.text);
+    if (!characterName || !text) {
+      res.status(400).json({ error: 'Informe o personagem e a fala.' });
+      return;
+    }
+    const { rows: maxRow } = await pool.query<{ next: number }>(
+      `SELECT COALESCE(MAX(line_number), 0) + 1 AS next FROM episode_lines WHERE episode_id = $1`,
+      [param(req, 'id')],
+    );
+    const { rows } = await pool.query(
+      `INSERT INTO episode_lines (episode_id, character_name, line_number, text, context)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [param(req, 'id'), characterName, maxRow[0]?.next ?? 1, text, asString(body.context) ?? null],
+    );
+    await logProject(actor, 'line.created', 'episode', param(req, 'id'), { characterName });
+    res.status(201).json(rows[0]);
+  }));
+
+  app.patch('/api/falas/:id', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { characterName?: unknown; text?: unknown; context?: unknown };
+    const { rows } = await pool.query(
+      `UPDATE episode_lines SET
+         character_name = COALESCE($2, character_name),
+         text = COALESCE($3, text),
+         context = COALESCE($4, context)
+       WHERE id = $1 RETURNING *`,
+      [param(req, 'id'), asString(body.characterName) ?? null, asString(body.text) ?? null, asString(body.context) ?? null],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Fala não encontrada.' });
+      return;
+    }
+    await logProject(actor, 'line.updated', 'episode', rows[0].episode_id);
+    res.json(rows[0]);
+  }));
+
+  app.delete('/api/falas/:id', requireActor(async (actor, req, res) => {
+    const { rows } = await pool.query('DELETE FROM episode_lines WHERE id = $1 RETURNING episode_id', [param(req, 'id')]);
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Fala não encontrada.' });
+      return;
+    }
+    await logProject(actor, 'line.deleted', 'episode', rows[0].episode_id);
+    res.json({ ok: true });
+  }));
+
+  // ---------- status de gravação por personagem ----------
+  app.get('/api/episodios/:id/gravacao', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query(
+      `SELECT r.*, d.display_name AS dubber_name
+         FROM recording_status r
+         JOIN dubbers d ON d.id = r.dubber_id
+        WHERE r.episode_id = $1
+        ORDER BY r.character_name ASC`,
+      [param(req, 'id')],
+    );
+    res.json(rows);
+  }));
+
+  app.post('/api/episodios/:id/gravacao', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { dubberId?: unknown; characterName?: unknown; status?: unknown; note?: unknown };
+    const dubberId = asString(body.dubberId);
+    const characterName = asString(body.characterName);
+    if (!dubberId || !characterName) {
+      res.status(400).json({ error: 'Informe o dublador e o personagem.' });
+      return;
+    }
+    const status = asString(body.status) ?? 'pendente';
+    const { rows } = await pool.query(
+      `INSERT INTO recording_status (episode_id, dubber_id, character_name, status, note, updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (episode_id, dubber_id, character_name)
+       DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = now()
+       RETURNING *`,
+      [param(req, 'id'), dubberId, characterName, status, asString(body.note) ?? null, actor.name],
+    );
+    await logProject(actor, 'recording.updated', 'episode', param(req, 'id'), { characterName, status });
+    res.status(201).json(rows[0]);
+  }));
+
+  // ---------- versões do roteiro ----------
+  app.get('/api/episodios/:id/versoes', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query(
+      `SELECT id, episode_id, author_name, created_at, length(content) AS chars
+         FROM script_versions WHERE episode_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      [param(req, 'id')],
+    );
+    res.json(rows);
+  }));
+
+  app.post('/api/episodios/:id/versoes', requireActor(async (actor, req, res) => {
+    const { rows: ep } = await pool.query<{ script: string | null }>('SELECT script FROM episodes WHERE id = $1', [param(req, 'id')]);
+    if (!ep[0]) {
+      res.status(404).json({ error: 'Episódio não encontrado.' });
+      return;
+    }
+    const content = ep[0].script ?? '';
+    if (!content.trim()) {
+      res.status(400).json({ error: 'Não há roteiro para versionar.' });
+      return;
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO script_versions (episode_id, content, author_id, author_name)
+       VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
+      [param(req, 'id'), content, actor.id, actor.name],
+    );
+    await logProject(actor, 'script.versioned', 'episode', param(req, 'id'));
+    res.status(201).json({ id: rows[0].id, createdAt: rows[0].created_at });
+  }));
+
+  app.get('/api/versoes/:id', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query('SELECT * FROM script_versions WHERE id = $1', [param(req, 'id')]);
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Versão não encontrada.' });
+      return;
+    }
+    res.json(rows[0]);
+  }));
+
+  // ---------- ficha pública (sem login, com dados mínimos) ----------
+  app.get('/api/publico/dubladores', wrap(async (_req, res) => {
+    const { rows } = await pool.query(
+      `SELECT d.public_slug, d.display_name, d.voice_tone, d.voice_types, d.self_level, d.classification,
+              (SELECT count(*)::int FROM samples s WHERE s.dubber_id = d.id AND s.review_status = 'aprovada') AS approved_samples
+         FROM dubbers d
+        WHERE d.is_public = true AND d.public_slug IS NOT NULL AND d.is_active = true
+        ORDER BY d.display_name ASC`,
+    );
+    res.json(rows);
+  }));
+
+  app.get('/api/publico/dubladores/:slug', wrap(async (req, res) => {
+    const { rows } = await pool.query(
+      `SELECT id, public_slug, display_name, voice_tone, voice_types, self_level, classification,
+              experience, specialties, interests, wanted_characters
+         FROM dubbers
+        WHERE public_slug = $1 AND is_public = true AND is_active = true`,
+      [param(req, 'slug')],
+    );
+    const d = rows[0];
+    if (!d) {
+      res.status(404).json({ error: 'Ficha não encontrada.' });
+      return;
+    }
+    const { rows: samples } = await pool.query(
+      `SELECT id, file_name, size_bytes, label, created_at FROM samples
+        WHERE dubber_id = $1 AND review_status = 'aprovada' ORDER BY created_at DESC LIMIT 5`,
+      [d.id],
+    );
+    // Nunca expõe discord_id, idade, notas internas ou histórico neste endpoint.
+    res.json({
+      displayName: d.display_name,
+      slug: d.public_slug,
+      voiceTone: d.voice_tone,
+      voiceTypes: d.voice_types ?? [],
+      selfLevel: d.self_level,
+      classification: d.classification,
+      experience: d.experience,
+      specialties: d.specialties ?? [],
+      interests: d.interests ?? [],
+      wantedCharacters: d.wanted_characters,
+      samples: samples.map((s: { id: string; file_name: string; size_bytes: number; label: string | null }) => ({
+        id: s.id,
+        fileName: s.file_name,
+        sizeBytes: s.size_bytes,
+        label: s.label,
+      })),
+    });
+  }));
+
+  // Áudio público: só de amostras aprovadas de fichas públicas.
+  app.get('/api/publico/audio/:id', wrap(async (req, res) => {
+    const sampleRepo = repo as SampleBytesRepository;
+    if (typeof sampleRepo.getSampleBytes !== 'function') {
+      res.status(501).json({ error: 'Áudio indisponível.' });
+      return;
+    }
+    const { rows: allowed } = await pool.query(
+      `SELECT 1 FROM samples s JOIN dubbers d ON d.id = s.dubber_id
+        WHERE s.id = $1 AND s.review_status = 'aprovada' AND d.is_public = true AND d.is_active = true`,
+      [param(req, 'id')],
+    );
+    if (!allowed[0]) {
+      res.status(404).json({ error: 'Amostra não encontrada.' });
+      return;
+    }
+    const found = await sampleRepo.getSampleBytes(param(req, 'id'));
+    if (!found) {
+      res.status(404).json({ error: 'Amostra não encontrada.' });
+      return;
+    }
+    res.setHeader('Content-Type', found.meta.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(found.bytes));
+  }));
+
+  // ---------- ficha pública: configuração pelo painel ----------
+  app.post('/api/fichas/:id/publicar', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { isPublic?: unknown; slug?: unknown };
+    const isPublic = body.isPublic === true;
+    const rawSlug = asString(body.slug);
+    const slug = rawSlug
+      ? rawSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
+      : null;
+    if (isPublic && !slug) {
+      res.status(400).json({ error: 'Informe um endereço (slug) para a ficha pública.' });
+      return;
+    }
+    try {
+      const { rows } = await pool.query(
+        `UPDATE dubbers SET is_public = $2, public_slug = $3 WHERE id = $1
+         RETURNING is_public, public_slug`,
+        [param(req, 'id'), isPublic, slug],
+      );
+      if (!rows[0]) {
+        res.status(404).json({ error: 'Ficha não encontrada.' });
+        return;
+      }
+      await logProject(actor, isPublic ? 'dubber.published' : 'dubber.unpublished', 'dubber', param(req, 'id'), { slug });
+      res.json(rows[0]);
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') {
+        res.status(409).json({ error: 'Esse endereço já está em uso por outra ficha.' });
+        return;
+      }
+      throw e;
+    }
   }));
 
   // ---------- avaliações / auditoria ----------

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type DubberDetails } from '../lib/api';
+import { api, type DubberDetails, type ReviewStatus, type SampleWithReview } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 const CLASSIFICATIONS = ['novato', 'aprendiz', 'intermediario', 'avancado', 'elite'] as const;
@@ -42,16 +42,76 @@ export default function FichaDetalhe() {
   const [error, setError] = useState('');
   const [nota, setNota] = useState('');
   const [busy, setBusy] = useState(false);
+  const [amostras, setAmostras] = useState<SampleWithReview[]>([]);
+  const [publicacao, setPublicacao] = useState<{ is_public: boolean; public_slug: string | null }>({ is_public: false, public_slug: null });
+  const [slug, setSlug] = useState('');
+
   const load = () =>
     api
       .ficha(id)
       .then(setData)
       .catch((e: unknown) => setError(errorText(e, 'Erro')));
 
+  const loadExtra = async () => {
+    try {
+      const [a, p] = await Promise.all([api.amostras(id), api.publicacao(id)]);
+      setAmostras(a);
+      setPublicacao(p);
+      setSlug(p.public_slug ?? '');
+    } catch {
+      /* silencioso: recursos opcionais */
+    }
+  };
+
   useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+    api
+      .ficha(id)
+      .then((r) => {
+        if (alive) setData(r);
+      })
+      .catch((e: unknown) => {
+        if (alive) setError(errorText(e, 'Erro'));
+      });
+    Promise.all([api.amostras(id), api.publicacao(id)])
+      .then(([a, p]) => {
+        if (!alive) return;
+        setAmostras(a);
+        setPublicacao(p);
+        setSlug(p.public_slug ?? '');
+      })
+      .catch(() => {
+        /* opcional: a ficha carrega mesmo sem estes dados */
+      });
+    return () => {
+      alive = false;
+    };
   }, [id]);
+
+  async function avaliar(sampleId: string, status: ReviewStatus) {
+    setBusy(true);
+    try {
+      await api.aprovarAmostra(sampleId, status);
+      await Promise.all([load(), loadExtra()]);
+    } catch (e: unknown) {
+      setError(errorText(e, 'Erro ao avaliar amostra'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publicar(isPublic: boolean) {
+    setBusy(true);
+    try {
+      const r = await api.publicarFicha(id, isPublic, slug.trim() || undefined);
+      setPublicacao(r);
+      if (r.public_slug) setSlug(r.public_slug);
+    } catch (e: unknown) {
+      setError(errorText(e, 'Erro ao publicar ficha'));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function classificar(next: string) {
     const reason = window.prompt(`Motivo da mudança para ${next.toUpperCase()}:`);
@@ -201,6 +261,69 @@ export default function FichaDetalhe() {
             onChange={(e) => e.target.files?.[0] && enviarAudio(e.target.files[0])}
           />
         </label>
+        <p className="muted tiny">MP3 ou WAV, até 10 MB por arquivo.</p>
+      </section>
+
+      <section className="card stack">
+        <h3>Aprovação das amostras</h3>
+        {!amostras.length && <p className="muted small">Nenhuma amostra para avaliar.</p>}
+        {amostras.map((s) => (
+          <div key={s.id} className="stack">
+            <div className="row space wrap gap">
+              <span className="small">
+                <strong>{s.label || s.file_name}</strong> ({kb(s.size_bytes)})
+              </span>
+              <div className="row gap">
+                <button
+                  className="btn ghost small"
+                  disabled={busy || s.review_status === 'aprovada'}
+                  onClick={() => void avaliar(s.id, 'aprovada')}
+                >
+                  Aprovar
+                </button>
+                <button
+                  className="btn ghost small"
+                  disabled={busy || s.review_status === 'recusada'}
+                  onClick={() => void avaliar(s.id, 'recusada')}
+                >
+                  Recusar
+                </button>
+              </div>
+            </div>
+            <span className="muted tiny">
+              Status: {s.review_status}
+              {s.reviewed_by ? ` · por ${s.reviewed_by}` : ''}
+              {s.review_note ? ` · ${s.review_note}` : ''}
+            </span>
+          </div>
+        ))}
+      </section>
+
+      <section className="card stack">
+        <h3>Ficha pública</h3>
+        {publicacao.is_public ? (
+          <p className="muted small">
+            Publicada em <code>/dubladores/{publicacao.public_slug}</code>
+          </p>
+        ) : (
+          <p className="muted small">Esta ficha não está visível fora do painel.</p>
+        )}
+        <div className="row gap wrap">
+          <input
+            className="search"
+            placeholder="endereco-da-ficha"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+          />
+          <button className="btn primary small" disabled={busy || !slug.trim()} onClick={() => void publicar(true)}>
+            {publicacao.is_public ? 'Atualizar' : 'Publicar ficha'}
+          </button>
+          {publicacao.is_public && (
+            <button className="btn ghost small" disabled={busy} onClick={() => void publicar(false)}>
+              Despublicar
+            </button>
+          )}
+        </div>
       </section>
 
       <section className="card stack">

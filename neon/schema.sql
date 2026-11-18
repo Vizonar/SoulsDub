@@ -155,6 +155,63 @@ CREATE TABLE IF NOT EXISTS project_members (
 );
 CREATE INDEX IF NOT EXISTS project_members_project_idx ON project_members(project_id);
 
+-- 12) Falas do roteiro, por personagem e por episódio
+CREATE TABLE IF NOT EXISTS episode_lines (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  episode_id     UUID NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  character_name TEXT NOT NULL,
+  line_number    INTEGER NOT NULL DEFAULT 0,
+  text           TEXT NOT NULL,
+  context        TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS episode_lines_episode_idx ON episode_lines(episode_id);
+CREATE INDEX IF NOT EXISTS episode_lines_character_idx ON episode_lines(episode_id, character_name);
+
+-- 13) Status de gravação: quem já gravou o quê em cada episódio
+CREATE TABLE IF NOT EXISTS recording_status (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  episode_id     UUID NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  dubber_id      UUID NOT NULL REFERENCES dubbers(id) ON DELETE CASCADE,
+  character_name TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'pendente'
+                 CHECK (status IN ('pendente', 'gravando', 'gravado', 'aprovado', 'refazer')),
+  note           TEXT,
+  updated_by     TEXT,
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (episode_id, dubber_id, character_name)
+);
+CREATE INDEX IF NOT EXISTS recording_status_episode_idx ON recording_status(episode_id);
+
+-- 14) Histórico de versões do roteiro (snapshot por episódio)
+CREATE TABLE IF NOT EXISTS script_versions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  episode_id UUID NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  content    TEXT NOT NULL,
+  author_id  UUID,
+  author_name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS script_versions_episode_idx ON script_versions(episode_id);
+
+-- 15) Ficha pública opcional do dublador
+ALTER TABLE dubbers ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE dubbers ADD COLUMN IF NOT EXISTS public_slug TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS dubbers_public_slug_idx ON dubbers(public_slug) WHERE public_slug IS NOT NULL;
+
+-- 16) Aprovação de amostras de voz
+ALTER TABLE samples ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pendente';
+ALTER TABLE samples ADD COLUMN IF NOT EXISTS review_note TEXT;
+ALTER TABLE samples ADD COLUMN IF NOT EXISTS reviewed_by TEXT;
+ALTER TABLE samples ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+UPDATE samples SET review_status = 'aprovada' WHERE review_status IS NULL OR review_status = '';
+ALTER TABLE samples ALTER COLUMN review_status SET DEFAULT 'pendente';
+ALTER TABLE samples ALTER COLUMN review_status SET NOT NULL;
+DO $$ BEGIN
+  ALTER TABLE samples ADD CONSTRAINT samples_review_status_check
+    CHECK (review_status IN ('pendente', 'aprovada', 'recusada'));
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
 -- Colunas que podem faltar em instalações antigas (idempotente)
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();

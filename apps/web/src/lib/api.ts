@@ -119,6 +119,52 @@ export const api = {
     request<{ id: string }>(`/api/projetos/${projectId}/elenco`, { method: 'POST', body: JSON.stringify(data) }),
 
   removerEscalacao: (castId: string) => request<{ ok: boolean }>(`/api/elenco/${castId}`, { method: 'DELETE' }),
+
+  // ---- falas do roteiro ----
+  falas: (episodeId: string) => request<EpisodeLine[]>(`/api/episodios/${episodeId}/falas`),
+
+  criarFala: (episodeId: string, data: { characterName: string; text: string; context?: string }) =>
+    request<EpisodeLine>(`/api/episodios/${episodeId}/falas`, { method: 'POST', body: JSON.stringify(data) }),
+
+  atualizarFala: (lineId: string, data: Partial<{ characterName: string; text: string; context: string }>) =>
+    request<EpisodeLine>(`/api/falas/${lineId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  removerFala: (lineId: string) => request<{ ok: boolean }>(`/api/falas/${lineId}`, { method: 'DELETE' }),
+
+  // ---- status de gravação ----
+  gravacao: (episodeId: string) => request<RecordingStatus[]>(`/api/episodios/${episodeId}/gravacao`),
+
+  marcarGravacao: (episodeId: string, data: { dubberId: string; characterName: string; status: RecordingState; note?: string }) =>
+    request<RecordingStatus>(`/api/episodios/${episodeId}/gravacao`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // ---- versões do roteiro ----
+  versoes: (episodeId: string) => request<ScriptVersion[]>(`/api/episodios/${episodeId}/versoes`),
+
+  salvarVersao: (episodeId: string) =>
+    request<{ id: string; createdAt: string }>(`/api/episodios/${episodeId}/versoes`, { method: 'POST' }),
+
+  verVersao: (versionId: string) => request<{ content: string; author_name: string; created_at: string }>(`/api/versoes/${versionId}`),
+
+  // ---- amostras / aprovação ----
+  amostras: (dubberId: string) => request<SampleWithReview[]>(`/api/fichas/${dubberId}/amostras`),
+
+  aprovarAmostra: (sampleId: string, status: ReviewStatus, note?: string) =>
+    request<{ ok: boolean }>(`/api/samples/${sampleId}/aprovacao`, { method: 'POST', body: JSON.stringify({ status, note }) }),
+
+  // ---- ficha pública ----
+  publicacao: (dubberId: string) => request<{ is_public: boolean; public_slug: string | null }>(`/api/fichas/${dubberId}/publicacao`),
+
+  publicarFicha: (dubberId: string, isPublic: boolean, slug?: string) =>
+    request<{ is_public: boolean; public_slug: string | null }>(`/api/fichas/${dubberId}/publicar`, {
+      method: 'POST',
+      body: JSON.stringify({ isPublic, slug }),
+    }),
+
+  catalogoPublico: () => request<PublicDubberSummary[]>('/api/publico/dubladores'),
+
+  fichaPublica: (slug: string) => request<PublicDubber>(`/api/publico/dubladores/${slug}`),
+
+  audioPublico: (sampleId: string) => `${BASE}/api/publico/audio/${sampleId}`,
 };
 
 // ---- tipos espelhados do pacote compartilhado ----
@@ -224,4 +270,88 @@ export interface CastMember {
   dubber_name: string;
   classification: string;
   created_at: string;
+}
+
+// ---- roteiro por personagem ----
+export interface EpisodeLine {
+  id: string;
+  episode_id: string;
+  character_name: string;
+  line_number: number;
+  text: string;
+  context?: string | null;
+  created_at: string;
+}
+
+// ---- status de gravação ----
+export type RecordingState = 'pendente' | 'gravando' | 'gravado' | 'aprovado' | 'refazer';
+
+export const RECORDING_LABEL: Record<RecordingState, string> = {
+  pendente: 'Pendente',
+  gravando: 'Gravando',
+  gravado: 'Gravado',
+  aprovado: 'Aprovado',
+  refazer: 'Refazer',
+};
+
+export interface RecordingStatus {
+  id: string;
+  episode_id: string;
+  dubber_id: string;
+  character_name: string;
+  status: RecordingState;
+  note?: string | null;
+  dubber_name: string;
+  updated_at: string;
+}
+
+// ---- versões ----
+export interface ScriptVersion {
+  id: string;
+  episode_id: string;
+  author_name: string;
+  created_at: string;
+  chars: number;
+}
+
+// ---- aprovação de amostras ----
+export type ReviewStatus = 'pendente' | 'aprovada' | 'recusada';
+
+export interface SampleWithReview {
+  id: string;
+  dubber_id: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  label?: string | null;
+  source: string;
+  created_at: string;
+  review_status: ReviewStatus;
+  review_note?: string | null;
+  reviewed_by?: string | null;
+}
+
+// ---- ficha pública ----
+export interface PublicDubberSummary {
+  public_slug: string;
+  display_name: string;
+  voice_tone: string;
+  voice_types: string[];
+  self_level: string;
+  classification: string;
+  approved_samples: number;
+}
+
+export interface PublicDubber {
+  displayName: string;
+  slug: string;
+  voiceTone: string;
+  voiceTypes: string[];
+  selfLevel: string;
+  classification: string;
+  experience?: string | null;
+  specialties: string[];
+  interests: string[];
+  wantedCharacters?: string | null;
+  samples: { id: string; fileName: string; sizeBytes: number; label?: string | null }[];
 }
