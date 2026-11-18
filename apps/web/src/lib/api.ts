@@ -96,6 +96,29 @@ export const api = {
   revisoes: () => request<unknown[]>('/api/revisoes'),
 
   auditoria: () => request<unknown[]>('/api/auditoria'),
+
+  // ---- projetos ----
+  projetos: () => request<Project[]>('/api/projetos'),
+
+  projeto: (id: string) => request<Project>(`/api/projetos/${id}`),
+
+  criarProjeto: (title: string, status: ProjectStatus) =>
+    request<Project>('/api/projetos', { method: 'POST', body: JSON.stringify({ title, status }) }),
+
+  episodios: (projectId: string) => request<Episode[]>(`/api/projetos/${projectId}/episodios`),
+
+  criarEpisodio: (projectId: string, data: { title: string; status: EpisodeStatus; script?: string }) =>
+    request<Episode>(`/api/projetos/${projectId}/episodios`, { method: 'POST', body: JSON.stringify(data) }),
+
+  atualizarEpisodio: (episodeId: string, data: Partial<{ title: string; status: EpisodeStatus; script: string }>) =>
+    request<Episode>(`/api/episodios/${episodeId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  elenco: (projectId: string) => request<CastMember[]>(`/api/projetos/${projectId}/elenco`),
+
+  escalar: (projectId: string, data: { dubberId: string; characterName: string; roleNote?: string }) =>
+    request<{ id: string }>(`/api/projetos/${projectId}/elenco`, { method: 'POST', body: JSON.stringify(data) }),
+
+  removerEscalacao: (castId: string) => request<{ ok: boolean }>(`/api/elenco/${castId}`, { method: 'DELETE' }),
 };
 
 // ---- tipos espelhados do pacote compartilhado ----
@@ -152,4 +175,53 @@ export interface DubberDetails {
   notes: Note[];
   audit: unknown[];
   samples: VoiceSample[];
+}
+
+// ---- projetos ----
+export type ProjectStatus = 'planejamento' | 'nao_iniciado' | 'em_producao' | 'pronto' | 'finalizado';
+export type EpisodeStatus = 'planejamento' | 'roteiro_pronto' | 'gravando' | 'mixando' | 'concluido';
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  planejamento: 'Em criação',
+  nao_iniciado: 'Não iniciado',
+  em_producao: 'Em andamento',
+  pronto: 'Pronto',
+  finalizado: 'Finalizado',
+};
+
+export const EPISODE_STATUS_LABEL: Record<EpisodeStatus, string> = {
+  planejamento: 'Em criação',
+  roteiro_pronto: 'Roteiro pronto',
+  gravando: 'Gravando',
+  mixando: 'Mixando',
+  concluido: 'Concluído',
+};
+
+export interface Project {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Episode {
+  id: string;
+  project_id: string;
+  title: string;
+  status: EpisodeStatus;
+  script?: string | null;
+  created_at: string;
+}
+
+export interface CastMember {
+  id: string;
+  project_id: string;
+  dubber_id: string;
+  character_name: string;
+  role_note?: string | null;
+  dubber_name: string;
+  classification: string;
+  created_at: string;
 }

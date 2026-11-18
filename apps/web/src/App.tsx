@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './lib/auth';
 import Login from './pages/Login';
 import Fichas from './pages/Fichas';
 import FichaDetalhe from './pages/FichaDetalhe';
+import Projetos from './pages/Projetos';
+import ProjetoDetalhe from './pages/ProjetoDetalhe';
 
 function Layout() {
   const { user, logout } = useAuth();
@@ -19,6 +21,9 @@ function Layout() {
         <nav className="nav">
           <NavLink to="/fichas" className={({ isActive }) => (isActive ? 'active' : '')}>
             Fichas
+          </NavLink>
+          <NavLink to="/projetos" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Projetos
           </NavLink>
         </nav>
         <div className="sidebar-foot">
@@ -52,6 +57,8 @@ export default function App() {
           <Route element={<Private />}>
             <Route path="/fichas" element={<Fichas />} />
             <Route path="/fichas/:id" element={<FichaDetalhe />} />
+            <Route path="/projetos" element={<Projetos />} />
+            <Route path="/projetos/:id" element={<ProjetoDetalhe />} />
             <Route path="/" element={<Navigate to="/fichas" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/fichas" replace />} />

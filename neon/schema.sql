@@ -118,3 +118,45 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 9) Projetos do estúdio (dobradagens em produção)
+CREATE TABLE IF NOT EXISTS projects (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'planejamento'
+             CHECK (status IN ('planejamento', 'nao_iniciado', 'em_producao', 'pronto', 'finalizado')),
+  notes      TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 10) Episódios de um projeto (com roteiro e status de produção)
+CREATE TABLE IF NOT EXISTS episodes (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'planejamento'
+             CHECK (status IN ('planejamento', 'roteiro_pronto', 'gravando', 'mixando', 'concluido')),
+  script     TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS episodes_project_idx ON episodes(project_id);
+
+-- 11) Elenco do projeto: dublador escalado para um personagem
+CREATE TABLE IF NOT EXISTS project_members (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id     UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  dubber_id      UUID NOT NULL REFERENCES dubbers(id) ON DELETE CASCADE,
+  character_name TEXT NOT NULL,
+  role_note      TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (project_id, dubber_id, character_name)
+);
+CREATE INDEX IF NOT EXISTS project_members_project_idx ON project_members(project_id);
+
+-- Colunas que podem faltar em instalações antigas (idempotente)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE episodes ADD COLUMN IF NOT EXISTS script TEXT;
+ALTER TABLE episodes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();

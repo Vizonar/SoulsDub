@@ -268,6 +268,130 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
     res.send(Buffer.from(found.bytes));
   }));
 
+  // ---------- projetos ----------
+  const logProject = async (actor: Actor, action: string, entity: string, entityId: string, details?: Record<string, unknown>) => {
+    await pool.query(
+      `INSERT INTO audit_log (actor_id, actor_name, action, entity, entity_id, details) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [actor.id, actor.name, action, entity, entityId, details ? JSON.stringify(details) : null],
+    );
+  };
+
+  app.get('/api/projetos', requireActor(async (_actor, _req, res) => {
+    const { rows } = await pool.query('SELECT * FROM projects ORDER BY created_at DESC');
+    res.json(rows);
+  }));
+
+  app.post('/api/projetos', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { title?: unknown; status?: unknown };
+    const title = asString(body.title);
+    if (!title) {
+      res.status(400).json({ error: 'Informe o nome do projeto.' });
+      return;
+    }
+    const { rows } = await pool.query(
+      'INSERT INTO projects (title, status) VALUES ($1, $2) RETURNING *',
+      [title, asString(body.status) ?? 'nao_iniciado'],
+    );
+    await logProject(actor, 'project.created', 'project', rows[0].id, { title });
+    res.status(201).json(rows[0]);
+  }));
+
+  app.get('/api/projetos/:id', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query('SELECT * FROM projects WHERE id = $1', [param(req, 'id')]);
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Projeto não encontrado.' });
+      return;
+    }
+    res.json(rows[0]);
+  }));
+
+  app.get('/api/projetos/:id/episodios', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query('SELECT * FROM episodes WHERE project_id = $1 ORDER BY created_at ASC', [param(req, 'id')]);
+    res.json(rows);
+  }));
+
+  app.post('/api/projetos/:id/episodios', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { title?: unknown; status?: unknown; script?: unknown };
+    const title = asString(body.title);
+    if (!title) {
+      res.status(400).json({ error: 'Informe o título do episódio.' });
+      return;
+    }
+    const { rows } = await pool.query(
+      'INSERT INTO episodes (project_id, title, status, script) VALUES ($1, $2, $3, $4) RETURNING *',
+      [param(req, 'id'), title, asString(body.status) ?? 'planejamento', asString(body.script) ?? null],
+    );
+    await logProject(actor, 'episode.created', 'episode', rows[0].id, { title });
+    res.status(201).json(rows[0]);
+  }));
+
+  app.patch('/api/episodios/:id', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { title?: unknown; status?: unknown; script?: unknown };
+    const { rows } = await pool.query(
+      `UPDATE episodes SET
+         title = COALESCE($2, title),
+         status = COALESCE($3, status),
+         script = COALESCE($4, script)
+       WHERE id = $1 RETURNING *`,
+      [param(req, 'id'), asString(body.title) ?? null, asString(body.status) ?? null, asString(body.script) ?? null],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Episódio não encontrado.' });
+      return;
+    }
+    await logProject(actor, 'episode.updated', 'episode', rows[0].id);
+    res.json(rows[0]);
+  }));
+
+  // ---------- elenco do projeto ----------
+  app.get('/api/projetos/:id/elenco', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query(
+      `SELECT m.id, m.project_id, m.dubber_id, m.character_name, m.role_note, m.created_at,
+              d.display_name AS dubber_name, d.classification
+         FROM project_members m
+         JOIN dubbers d ON d.id = m.dubber_id
+        WHERE m.project_id = $1
+        ORDER BY m.character_name ASC`,
+      [param(req, 'id')],
+    );
+    res.json(rows);
+  }));
+
+  app.post('/api/projetos/:id/elenco', requireActor(async (actor, req, res) => {
+    const body = (req.body ?? {}) as { dubberId?: unknown; characterName?: unknown; roleNote?: unknown };
+    const dubberId = asString(body.dubberId);
+    const characterName = asString(body.characterName);
+    if (!dubberId || !characterName) {
+      res.status(400).json({ error: 'Escolha o dublador e o personagem.' });
+      return;
+    }
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO project_members (project_id, dubber_id, character_name, role_note)
+         VALUES ($1,$2,$3,$4) RETURNING id`,
+        [param(req, 'id'), dubberId, characterName, asString(body.roleNote) ?? null],
+      );
+      await logProject(actor, 'cast.added', 'project', param(req, 'id'), { characterName });
+      res.status(201).json({ id: rows[0].id });
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') {
+        res.status(409).json({ error: 'Esse dublador já está escalado para esse personagem.' });
+        return;
+      }
+      throw e;
+    }
+  }));
+
+  app.delete('/api/elenco/:id', requireActor(async (actor, req, res) => {
+    const { rows } = await pool.query('DELETE FROM project_members WHERE id = $1 RETURNING project_id', [param(req, 'id')]);
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Escalação não encontrada.' });
+      return;
+    }
+    await logProject(actor, 'cast.removed', 'project', rows[0].project_id);
+    res.json({ ok: true });
+  }));
+
   // ---------- avaliações / auditoria ----------
   app.get('/api/revisoes', requireActor(async (actor, _req, res) => {
     res.json(await repo.listReviews(actor));
