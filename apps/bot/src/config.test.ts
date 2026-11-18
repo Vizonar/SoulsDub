@@ -4,13 +4,13 @@ import { ConfigError, isAuthorizedAdmin, loadConfig } from './config.js';
 describe('configuração', () => {
   it('funciona sem nenhuma credencial (desenvolvimento) e usa padrões seguros', () => {
     const c = loadConfig({});
-    expect(c).toMatchObject({ storage: 'supabase', policy: { requireAge: false }, rules: { allowUpdates: true, updateCooldownHours: 0 }, adminRoleIds: [] });
+    expect(c).toMatchObject({ storage: 'neon', policy: { requireAge: false }, rules: { allowUpdates: true, updateCooldownHours: 0 }, adminRoleIds: [] });
   });
   it('exige credenciais só quando o bot vai conectar', () => {
     expect(() => loadConfig({}, { discord: true })).toThrow(ConfigError);
-    expect(() => loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c' }, { discord: true })).toThrow(/SUPABASE_URL/);
+    expect(() => loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c' }, { discord: true })).toThrow(/DATABASE_URL/);
     expect(loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', BOT_STORAGE: 'memory' }, { discord: true }).token).toBe('t');
-    expect(loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', SUPABASE_URL: 'u', SUPABASE_SERVICE_ROLE_KEY: 'k' }, { discord: true }).storage).toBe('supabase');
+    expect(loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DATABASE_URL: 'postgres://db' }, { discord: true }).storage).toBe('neon');
   });
   it('interpreta regras do formulário e cargos de administrador', () => {
     const c = loadConfig({ FORM_REQUIRE_AGE: 'true', FORM_ALLOW_UPDATES: 'false', FORM_UPDATE_COOLDOWN_HOURS: '12', DISCORD_ADMIN_ROLE_IDS: ' 1, 2 ,' });

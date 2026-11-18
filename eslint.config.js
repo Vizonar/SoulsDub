@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'coverage/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'coverage/**', '**/assets/**', '**/public/**', '**/*.mjs', 'index-*.js', 'index.html', 'render.yaml', 'vercel.json', 'packages/shared/src/pg-repository.ts'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

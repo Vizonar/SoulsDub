@@ -10,9 +10,8 @@ const schema = z.object({
   DISCORD_GUILD_ID: z.string().optional(),
   DISCORD_RECRUITMENT_CHANNEL_ID: z.string().optional(),
   DISCORD_ADMIN_ROLE_IDS: z.string().optional(),
-  SUPABASE_URL: z.string().optional(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
-  BOT_STORAGE: z.enum(['supabase', 'memory']).default('supabase'),
+  DATABASE_URL: z.string().optional(),
+  BOT_STORAGE: z.enum(['neon', 'memory']).default('neon'),
   FORM_REQUIRE_AGE: bool(false),
   FORM_ALLOW_UPDATES: bool(true),
   FORM_UPDATE_COOLDOWN_HOURS: z.coerce.number().min(0).max(24 * 365).default(0),
@@ -24,9 +23,8 @@ export interface BotConfig {
   guildId?: string;
   recruitmentChannelId?: string;
   adminRoleIds: string[];
-  storage: 'supabase' | 'memory';
-  supabaseUrl?: string;
-  serviceRoleKey?: string;
+  storage: 'neon' | 'memory';
+  databaseUrl?: string;
   policy: FormPolicy;
   rules: SubmitRules;
 }
@@ -52,16 +50,15 @@ export function loadConfig(env: Record<string, string | undefined>, need: { disc
     recruitmentChannelId: clean(e.DISCORD_RECRUITMENT_CHANNEL_ID),
     adminRoleIds: (e.DISCORD_ADMIN_ROLE_IDS ?? '').split(',').map((x) => x.trim()).filter(Boolean),
     storage: e.BOT_STORAGE,
-    supabaseUrl: clean(e.SUPABASE_URL),
-    serviceRoleKey: clean(e.SUPABASE_SERVICE_ROLE_KEY),
+    databaseUrl: clean(e.DATABASE_URL),
     policy: { requireAge: e.FORM_REQUIRE_AGE },
     rules: { allowUpdates: e.FORM_ALLOW_UPDATES, updateCooldownHours: e.FORM_UPDATE_COOLDOWN_HOURS },
   };
   const problems: string[] = [];
   if (need.discord && !cfg.token) problems.push('DISCORD_TOKEN não definido.');
   if ((need.discord || need.clientId) && !cfg.clientId) problems.push('DISCORD_CLIENT_ID não definido.');
-  if (need.discord && cfg.storage === 'supabase' && (!cfg.supabaseUrl || !cfg.serviceRoleKey)) {
-    problems.push('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios com BOT_STORAGE=supabase (ou use BOT_STORAGE=memory só para testes).');
+  if (need.discord && cfg.storage === 'neon' && !cfg.databaseUrl) {
+    problems.push('DATABASE_URL é obrigatório com BOT_STORAGE=neon (connection string do Neon).');
   }
   if (problems.length) throw new ConfigError(problems);
   return cfg;

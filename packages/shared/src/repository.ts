@@ -65,7 +65,7 @@ export type SampleSubmitResult =
 export type ReviewWithName = Review & { dubberName: string };
 
 export interface DubberRepository {
-  readonly kind: 'memory' | 'supabase';
+  readonly kind: 'memory' | 'supabase' | 'neon';
   // ---- Usado pelo bot (contexto de sistema, sem ator administrativo) ----
   findByDiscordId(discordId: string): Promise<Dubber | null>;
   upsertFromForm(discordId: string, form: DubberForm, rules?: SubmitRules): Promise<SubmitResult>;

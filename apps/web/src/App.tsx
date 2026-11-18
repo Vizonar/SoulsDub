@@ -1,69 +1,62 @@
-import { useMemo, useState } from 'react';
-import { HashRouter, Route, Routes } from 'react-router-dom';
-import { DEMO_ADMIN, DEMO_REVIEWER, type Actor } from '@soul/shared';
-import { Layout } from './components/Layout.js';
-import { ErrorBox } from './components/ui.js';
-import { AppProvider } from './lib/app-context.js';
-import { parseEnv } from './lib/env.js';
-import { createBackend, type AppBackend } from './lib/repository-factory.js';
-import { Projects } from './pages/Projects.js';
-import { ProjectDetail } from './pages/ProjectDetail.js';
-import { Activity } from './pages/Activity.js';
-import { Dashboard } from './pages/Dashboard.js';
-import { Directory } from './pages/Directory.js';
-import { AuthLoading, LoginScreen, NoAccess, useSession, useStaffActor } from './pages/Login.js';
-import { Reviews } from './pages/Reviews.js';
+import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
+import { AuthProvider, useAuth } from './lib/auth';
+import Login from './pages/Login';
+import Fichas from './pages/Fichas';
+import FichaDetalhe from './pages/FichaDetalhe';
 
-function Shell() {
+function Layout() {
+  const { user, logout } = useAuth();
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/dubladores/:id?" element={<Directory />} />
-        <Route path="/projetos" element={<Projects />} />
-        <Route path="/projetos/:id" element={<ProjectDetail />} />
-        <Route path="/avaliacoes" element={<Reviews />} />
-        <Route path="/atividade" element={<Activity />} />
-        <Route path="*" element={<Dashboard />} />
-      </Routes>
-    </Layout>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand small">
+          <span className="brand-mark">VT</span>
+          <div>
+            <strong>Vox Trupe</strong>
+            <p className="muted tiny">Studios</p>
+          </div>
+        </div>
+        <nav className="nav">
+          <NavLink to="/fichas" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Fichas
+          </NavLink>
+        </nav>
+        <div className="sidebar-foot">
+          <p className="small">{user?.name}</p>
+          <p className="muted tiny">{user?.role === 'admin' ? 'Administrador' : 'Revisor'}</p>
+          <button className="btn ghost small" onClick={() => void logout()}>
+            Sair
+          </button>
+        </div>
+      </aside>
+      <main className="content">
+        <Outlet />
+      </main>
+    </div>
   );
 }
 
-function DemoApp({ backend }: { backend: Extract<AppBackend, { kind: 'demo' }> }) {
-  const [role, setRole] = useState<Actor['role']>('admin');
-  const actor = role === 'admin' ? DEMO_ADMIN : DEMO_REVIEWER;
-  return (
-    <AppProvider mode="demo" repo={backend.repo} actor={actor} setDemoRole={setRole}>
-      <HashRouter><Shell /></HashRouter>
-    </AppProvider>
-  );
-}
-
-function ProductionApp({ backend }: { backend: Extract<AppBackend, { kind: 'production' }> }) {
-  const session = useSession(backend.supabase);
-  const staff = useStaffActor(backend.supabase, session);
-  const signOut = () => void backend.supabase.auth.signOut();
-  if (session === undefined || (session && staff.loading)) return <AuthLoading />;
-  if (!session) return <LoginScreen supabase={backend.supabase} />;
-  if (!staff.data) return <NoAccess onSignOut={signOut} error={staff.error} />;
-  return (
-    <AppProvider mode="production" repo={backend.repo} actor={staff.data} signOut={signOut}>
-      <HashRouter><Shell /></HashRouter>
-    </AppProvider>
-  );
+function Private() {
+  const { user, loading } = useAuth();
+  if (loading) return <p className="muted center">Carregando...</p>;
+  if (!user) return <Navigate to="/login" replace />;
+  return <Layout />;
 }
 
 export default function App() {
-  const backend = useMemo(() => createBackend(parseEnv(import.meta.env as Record<string, string | undefined>)), []);
-  if (backend.kind === 'misconfigured') {
-    return (
-      <div className="mx-auto max-w-xl space-y-3 p-8">
-        <h1 className="text-xl font-semibold">Configuração incompleta</h1>
-        {backend.problems.map((p) => <ErrorBox key={p} message={p} />)}
-        <p className="text-sm text-ink-soft">Ajuste o arquivo .env e reinicie. Para apenas explorar, use VITE_APP_MODE=demo.</p>
-      </div>
-    );
-  }
-  return backend.kind === 'demo' ? <DemoApp backend={backend} /> : <ProductionApp backend={backend} />;
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route element={<Private />}>
+            <Route path="/fichas" element={<Fichas />} />
+            <Route path="/fichas/:id" element={<FichaDetalhe />} />
+            <Route path="/" element={<Navigate to="/fichas" replace />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/fichas" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }

@@ -9,4 +9,5 @@ export * from './csv.js';
 export * from './samples.js';
 export * from './repository.js';
 export * from './supabase-repository.js';
+export * from './pg-repository.js';
 export * from './demo-data.js';

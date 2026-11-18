@@ -1,8 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { config as loadDotenv } from 'dotenv';
-import { createClient } from '@supabase/supabase-js';
-import { MemoryRepository, SupabaseRepository, type DubberRepository } from '@soul/shared';
+import { MemoryRepository, PgRepository, type DubberRepository } from '@soul/shared';
 import { ConfigError, loadConfig } from './config.js';
 import { routeInteraction } from './handlers.js';
 import { SessionStore } from './wizard/wizard.js';
@@ -24,11 +23,11 @@ async function main() {
 
   let repo: DubberRepository;
   if (config.storage === 'memory') {
-    console.warn('[bot] BOT_STORAGE=memory: as fichas NÃO serão gravadas no Supabase (apenas teste).');
+    console.warn('[bot] BOT_STORAGE=memory: as fichas NÃO serão gravadas no banco (apenas teste).');
     repo = new MemoryRepository();
   } else {
-    // A chave de service role existe somente neste processo privado; nunca vai ao navegador.
-    repo = new SupabaseRepository(createClient(config.supabaseUrl!, config.serviceRoleKey!, { auth: { persistSession: false, autoRefreshToken: false } }));
+    console.log('[bot] armazenamento: Neon (Postgres)');
+    repo = new PgRepository(config.databaseUrl!);
   }
 
   const store = new SessionStore();
@@ -36,10 +35,18 @@ async function main() {
   client.once(Events.ClientReady, (c) => console.log(`[bot] conectado como ${c.user.tag}`));
   client.on(Events.InteractionCreate, (i) => void routeInteraction(i, { repo, store, config, client }));
   setInterval(() => store.sweep(Date.now()), 5 * 60 * 1000).unref();
-  await client.login(config.token);
 
-  // Proxy REST para o site (não expõe chave no navegador)
-  import('./server.js');
+  // Inicia a API antes do login no Discord para que o health check do Render responda
+  // mesmo se o gateway do Discord estiver indisponível temporariamente.
+  if (config.databaseUrl) {
+    const { startServer } = await import('./server.js');
+    await startServer({
+      repo,
+      databaseUrl: config.databaseUrl,
+      origin: (process.env.WEB_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    });
+  }
+  await client.login(config.token);
 }
 
 void main();

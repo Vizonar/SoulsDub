@@ -147,3 +147,8 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+.neon
+
+# Legacy generated web bundles (do not commit built assets)
+/assets/*.js
+/apps/web/dist/
