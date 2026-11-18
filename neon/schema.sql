@@ -158,5 +158,9 @@ CREATE INDEX IF NOT EXISTS project_members_project_idx ON project_members(projec
 -- Colunas que podem faltar em instalações antigas (idempotente)
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE episodes ADD COLUMN IF NOT EXISTS status TEXT;
 ALTER TABLE episodes ADD COLUMN IF NOT EXISTS script TEXT;
 ALTER TABLE episodes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+UPDATE episodes SET status = 'planejamento' WHERE status IS NULL OR status = '';
+ALTER TABLE episodes ALTER COLUMN status SET DEFAULT 'planejamento';
+ALTER TABLE episodes ALTER COLUMN status SET NOT NULL;
