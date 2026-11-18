@@ -185,7 +185,7 @@ export function renderModal(name: ModalName, d: Draft, policy: FormPolicy): Moda
 export function renderStartMessage(): { embeds: EmbedBuilder[]; components: ActionRowBuilder<MessageActionRowComponentBuilder>[] } {
   const embed = new EmbedBuilder()
     .setColor(COLOR)
-    .setTitle('🎙️ Ficha do dublador — Soul Dublers')
+    .setTitle('🎙️ Ficha do dublador — Vox Trupe Studios')
     .setDescription(
       'Clique em **Preencher ficha** para se cadastrar. O formulário abre só para você e tem 3 etapas, com revisão antes do envio.\n' +
         'Se já enviou uma ficha, o mesmo botão permite atualizá-la (conforme as regras da comunidade).',
