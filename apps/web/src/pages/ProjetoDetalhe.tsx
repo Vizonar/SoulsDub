@@ -32,39 +32,48 @@ export default function ProjetoDetalhe() {
   const [busy, setBusy] = useState(false);
   const [scriptEdit, setScriptEdit] = useState<{ id: string; text: string } | null>(null);
   const [epAberto, setEpAberto] = useState<string | null>(null);
+  const [buscaElenco, setBuscaElenco] = useState('');
+  const [pendencias, setPendencias] = useState<{ characterName: string; lines: number }[]>([]);
 
-  const load = useCallback(async () => {
-    try {
-      const [p, eps, cast, fichas] = await Promise.all([
-        api.projeto(id),
-        api.episodios(id),
-        api.elenco(id),
-        api.fichas({ pageSize: '100' }),
-      ]);
-      setProjeto(p);
-      setEpisodios(eps);
-      setElenco(cast);
-      setDubbers(fichas.items);
-    } catch (e: unknown) {
-      setError(errorText(e, 'Erro ao carregar o projeto'));
-    }
-  }, [id]);
+  const load = useCallback(
+    async (search?: string) => {
+      try {
+        const [p, eps, cast, fichas, pen] = await Promise.all([
+          api.projeto(id),
+          api.episodios(id),
+          api.elenco(id, search),
+          api.fichas({ pageSize: '100' }),
+          api.pendenciasProjeto(id),
+        ]);
+        setProjeto(p);
+        setEpisodios(eps);
+        setElenco(cast);
+        setDubbers(fichas.items);
+        setPendencias(pen);
+      } catch (e: unknown) {
+        setError(errorText(e, 'Erro ao carregar o projeto'));
+      }
+    },
+    [id],
+  );
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [p, eps, cast, fichas] = await Promise.all([
+        const [p, eps, cast, fichas, pen] = await Promise.all([
           api.projeto(id),
           api.episodios(id),
           api.elenco(id),
           api.fichas({ pageSize: '100' }),
+          api.pendenciasProjeto(id),
         ]);
         if (!alive) return;
         setProjeto(p);
         setEpisodios(eps);
         setElenco(cast);
         setDubbers(fichas.items);
+        setPendencias(pen);
       } catch (e: unknown) {
         if (alive) setError(errorText(e, 'Erro ao carregar o projeto'));
       }
@@ -167,6 +176,30 @@ export default function ProjetoDetalhe() {
       <section className="card stack">
         <h3>Elenco ({elenco.length})</h3>
 
+        {pendencias.length > 0 && (
+          <div className="warn-box">
+            <strong className="small">⚠ Falas de personagens sem dublador escalado:</strong>
+            <ul className="small">
+              {pendencias.map((p) => (
+                <li key={p.characterName}>
+                  {p.characterName} — {p.lines} fala(s)
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <input
+          className="search"
+          placeholder="Buscar personagem ou dublador..."
+          value={buscaElenco}
+          onChange={(e) => setBuscaElenco(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void load(buscaElenco.trim() || undefined);
+          }}
+          onBlur={() => void load(buscaElenco.trim() || undefined)}
+        />
+
         {elenco.map((m) => (
           <div key={m.id} className="row space">
             <span>
@@ -176,9 +209,14 @@ export default function ProjetoDetalhe() {
                 {m.role_note ? ` · ${m.role_note}` : ''}
               </span>
             </span>
-            <button className="btn ghost small" disabled={busy} onClick={() => void removerEscalacao(m.id)}>
-              Remover
-            </button>
+            <span className="row gap">
+              <Link className="btn ghost small" to={`/projetos/${id}/roteiro/${m.dubber_id}`}>
+                Falas
+              </Link>
+              <button className="btn ghost small" disabled={busy} onClick={() => void removerEscalacao(m.id)}>
+                Remover
+              </button>
+            </span>
           </div>
         ))}
         {!elenco.length && <p className="muted small">Nenhum dublador escalado ainda.</p>}
@@ -267,12 +305,17 @@ export default function ProjetoDetalhe() {
                           ? `${ep.script.slice(0, 160)}${ep.script.length > 160 ? '…' : ''}`
                           : 'Sem roteiro escrito.'}
                       </p>
-                      <button
-                        className="btn ghost small"
-                        onClick={() => setScriptEdit({ id: ep.id, text: ep.script ?? '' })}
-                      >
-                        {ep.script ? 'Editar roteiro' : 'Escrever roteiro'}
-                      </button>
+                      <div className="row gap">
+                        <button
+                          className="btn ghost small"
+                          onClick={() => setScriptEdit({ id: ep.id, text: ep.script ?? '' })}
+                        >
+                          {ep.script ? 'Editar roteiro' : 'Escrever roteiro'}
+                        </button>
+                        <a className="btn ghost small" href={api.exportarRoteiro(ep.id)} download>
+                          Baixar roteiro (.txt)
+                        </a>
+                      </div>
                     </div>
                   )}
 

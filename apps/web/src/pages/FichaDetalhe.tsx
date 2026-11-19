@@ -45,6 +45,7 @@ export default function FichaDetalhe() {
   const [amostras, setAmostras] = useState<SampleWithReview[]>([]);
   const [publicacao, setPublicacao] = useState<{ is_public: boolean; public_slug: string | null }>({ is_public: false, public_slug: null });
   const [slug, setSlug] = useState('');
+  const [discordTag, setDiscordTag] = useState('');
 
   const load = () =>
     api
@@ -54,10 +55,11 @@ export default function FichaDetalhe() {
 
   const loadExtra = async () => {
     try {
-      const [a, p] = await Promise.all([api.amostras(id), api.publicacao(id)]);
+      const [a, p, d] = await Promise.all([api.amostras(id), api.publicacao(id), api.discordLink(id)]);
       setAmostras(a);
       setPublicacao(p);
       setSlug(p.public_slug ?? '');
+      setDiscordTag(d.discordTag ?? '');
     } catch {
       /* silencioso: recursos opcionais */
     }
@@ -73,12 +75,13 @@ export default function FichaDetalhe() {
       .catch((e: unknown) => {
         if (alive) setError(errorText(e, 'Erro'));
       });
-    Promise.all([api.amostras(id), api.publicacao(id)])
-      .then(([a, p]) => {
+    Promise.all([api.amostras(id), api.publicacao(id), api.discordLink(id)])
+      .then(([a, p, d]) => {
         if (!alive) return;
         setAmostras(a);
         setPublicacao(p);
         setSlug(p.public_slug ?? '');
+        setDiscordTag(d.discordTag ?? '');
       })
       .catch(() => {
         /* opcional: a ficha carrega mesmo sem estes dados */
@@ -108,6 +111,17 @@ export default function FichaDetalhe() {
       if (r.public_slug) setSlug(r.public_slug);
     } catch (e: unknown) {
       setError(errorText(e, 'Erro ao publicar ficha'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function salvarDiscord() {
+    setBusy(true);
+    try {
+      await api.salvarDiscord(id, discordTag.trim());
+    } catch (e: unknown) {
+      setError(errorText(e, 'Erro ao salvar contato'));
     } finally {
       setBusy(false);
     }
@@ -323,6 +337,26 @@ export default function FichaDetalhe() {
               Despublicar
             </button>
           )}
+        </div>
+      </section>
+
+      <section className="card stack">
+        <h3>Contato (Discord)</h3>
+        <p className="muted small">Tag visível apenas para a equipe do painel.</p>
+        <div className="row gap wrap">
+          <input
+            className="search"
+            placeholder="@usuario ou usuario#0000"
+            value={discordTag}
+            onChange={(e) => setDiscordTag(e.target.value)}
+          />
+          <button
+            className="btn primary small"
+            disabled={busy || !discordTag.trim()}
+            onClick={() => void salvarDiscord()}
+          >
+            Salvar
+          </button>
         </div>
       </section>
 

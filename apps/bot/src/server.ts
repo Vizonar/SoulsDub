@@ -217,6 +217,30 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
     res.json(rows[0]);
   }));
 
+  // Tag do Discord do dublador (para contato direto)
+  app.get('/api/fichas/:id/discord', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query('SELECT discord_tag FROM dubbers WHERE id = $1', [param(req, 'id')]);
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Ficha não encontrada.' });
+      return;
+    }
+    res.json({ discordTag: rows[0].discord_tag ?? null });
+  }));
+
+  app.patch('/api/fichas/:id/discord', requireActor(async (actor, req, res) => {
+    const tag = asString((req.body as { discordTag?: unknown })?.discordTag);
+    const { rows } = await pool.query(
+      'UPDATE dubbers SET discord_tag = $2 WHERE id = $1 RETURNING discord_tag',
+      [param(req, 'id'), tag ?? null],
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: 'Ficha não encontrada.' });
+      return;
+    }
+    await logProject(actor, 'dubber.discord_tag', 'dubber', param(req, 'id'), { tag });
+    res.json({ discordTag: rows[0].discord_tag ?? null });
+  }));
+
   app.patch('/api/fichas/:id', requireActor(async (actor, req, res) => {
     res.json(await repo.updateDubber(actor, param(req, 'id'), req.body ?? {}));
   }));
@@ -388,16 +412,39 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
 
   // ---------- elenco do projeto ----------
   app.get('/api/projetos/:id/elenco', requireActor(async (_actor, req, res) => {
+    const search = asString(req.query.search);
     const { rows } = await pool.query(
       `SELECT m.id, m.project_id, m.dubber_id, m.character_name, m.role_note, m.created_at,
               d.display_name AS dubber_name, d.classification
          FROM project_members m
          JOIN dubbers d ON d.id = m.dubber_id
         WHERE m.project_id = $1
+          AND ($2::text IS NULL OR m.character_name ILIKE '%' || $2 || '%' OR d.display_name ILIKE '%' || $2 || '%')
         ORDER BY m.character_name ASC`,
-      [param(req, 'id')],
+      [param(req, 'id'), search ?? null],
     );
     res.json(rows);
+  }));
+
+  /**
+   * Personagens que aparecem no roteiro mas ainda não têm dublador escalado.
+   * Evita descobrir a falta de elenco só no dia da gravação.
+   */
+  app.get('/api/projetos/:id/pendencias', requireActor(async (_actor, req, res) => {
+    const { rows } = await pool.query<{ character_name: string; total: string }>(
+      `SELECT l.character_name, count(*)::text AS total
+         FROM episode_lines l
+         JOIN episodes e ON e.id = l.episode_id
+        WHERE e.project_id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM project_members m
+             WHERE m.project_id = e.project_id AND lower(m.character_name) = lower(l.character_name)
+          )
+        GROUP BY l.character_name
+        ORDER BY count(*) DESC`,
+      [param(req, 'id')],
+    );
+    res.json(rows.map((r) => ({ characterName: r.character_name, lines: Number(r.total) })));
   }));
 
   app.post('/api/projetos/:id/elenco', requireActor(async (actor, req, res) => {
@@ -504,6 +551,57 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
       [param(req, 'id')],
     );
     res.json(rows);
+  }));
+
+  /**
+   * Página de gravação do dublador: junta as falas do personagem dele
+   * em todos os episódios do projeto, com o status atual de cada uma.
+   */
+  app.get('/api/projetos/:id/meu-roteiro/:dubberId', requireActor(async (_actor, req, res) => {
+    const projectId = param(req, 'id');
+    const dubberId = param(req, 'dubberId');
+    const { rows: member } = await pool.query(
+      'SELECT character_name FROM project_members WHERE project_id = $1 AND dubber_id = $2',
+      [projectId, dubberId],
+    );
+    if (!member.length) {
+      res.status(404).json({ error: 'Este dublador não faz parte do elenco deste projeto.' });
+      return;
+    }
+    const characters = member.map((m) => m.character_name);
+    const { rows } = await pool.query(
+      `SELECT e.id AS episode_id, e.title AS episode_title, e.status AS episode_status,
+              l.character_name, l.line_number, l.text, l.context,
+              r.status AS recording_status
+         FROM episode_lines l
+         JOIN episodes e ON e.id = l.episode_id
+         LEFT JOIN recording_status r
+           ON r.episode_id = e.id AND r.dubber_id = $2 AND lower(r.character_name) = lower(l.character_name)
+        WHERE e.project_id = $1
+          AND lower(l.character_name) = ANY($3::text[])
+        ORDER BY e.created_at ASC, l.line_number ASC`,
+      [projectId, dubberId, characters.map((c) => c.toLowerCase())],
+    );
+    res.json({
+      characters,
+      episodes: [...new Set(rows.map((r) => r.episode_id))].map((episodeId) => {
+        const first = rows.find((r) => r.episode_id === episodeId);
+        return {
+          episodeId,
+          episodeTitle: first?.episode_title ?? '',
+          episodeStatus: first?.episode_status ?? 'planejamento',
+          lines: rows
+            .filter((r) => r.episode_id === episodeId)
+            .map((r) => ({
+              characterName: r.character_name,
+              lineNumber: r.line_number,
+              text: r.text,
+              context: r.context,
+              recordingStatus: r.recording_status ?? 'pendente',
+            })),
+        };
+      }),
+    });
   }));
 
   app.post('/api/episodios/:id/gravacao', requireActor(async (actor, req, res) => {
@@ -676,7 +774,64 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
     }
   }));
 
-  // ---------- avaliações / auditoria ----------
+  // ---------- exportar roteiro (.txt) ----------
+  app.get('/api/episodios/:id/exportar', requireActor(async (_actor, req, res) => {
+    const epId = param(req, 'id');
+    const { rows: ep } = await pool.query('SELECT title FROM episodes WHERE id = $1', [epId]);
+    if (!ep[0]) {
+      res.status(404).json({ error: 'Episódio não encontrado.' });
+      return;
+    }
+    const { rows: lines } = await pool.query(
+      'SELECT character_name, text FROM episode_lines WHERE episode_id = $1 ORDER BY line_number ASC',
+      [epId],
+    );
+    const content = lines.map((l) => `${l.character_name.toUpperCase()}: ${l.text}`).join('\n\n');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${ep[0].title.replace(/[^a-z0-9]/gi, '_')}.txt"`);
+    res.send(content);
+  }));
+
+  // ---------- dashboard e backup ----------
+  app.get('/api/dashboard', requireActor(async (actor, _req, res) => {
+    const [
+      { rows: projs },
+      { rows: eps },
+      { rows: dubs },
+      { rows: samples },
+    ] = await Promise.all([
+      pool.query('SELECT count(*)::int as c FROM projects'),
+      pool.query('SELECT count(*)::int as c FROM episodes'),
+      pool.query('SELECT count(*)::int as c FROM dubbers WHERE is_active = true'),
+      pool.query('SELECT count(*)::int as c FROM samples WHERE review_status = \'pendente\''),
+    ]);
+    res.json({
+      projects: projs[0].c,
+      episodes: eps[0].c,
+      activeDubbers: dubs[0].c,
+      pendingSamples: samples[0].c,
+    });
+  }));
+
+  app.get('/api/backup', requireActor(async (actor, _req, res) => {
+    if (actor.role !== 'admin') {
+      res.status(403).json({ error: 'Acesso negado.' });
+      return;
+    }
+    const [dubbers, projects, eps, lines] = await Promise.all([
+      pool.query('SELECT * FROM dubbers'),
+      pool.query('SELECT * FROM projects'),
+      pool.query('SELECT * FROM episodes'),
+      pool.query('SELECT * FROM episode_lines'),
+    ]);
+    res.json({
+      exportedAt: new Date(),
+      dubbers: dubbers.rows,
+      projects: projects.rows,
+      episodes: eps.rows,
+      lines: lines.rows,
+    });
+  }));
   app.get('/api/revisoes', requireActor(async (actor, _req, res) => {
     res.json(await repo.listReviews(actor));
   }));

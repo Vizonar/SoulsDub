@@ -105,6 +105,9 @@ export const api = {
   criarProjeto: (title: string, status: ProjectStatus) =>
     request<Project>('/api/projetos', { method: 'POST', body: JSON.stringify({ title, status }) }),
 
+  pendenciasProjeto: (projectId: string) =>
+    request<{ characterName: string; lines: number }[]>(`/api/projetos/${projectId}/pendencias`),
+
   episodios: (projectId: string) => request<Episode[]>(`/api/projetos/${projectId}/episodios`),
 
   criarEpisodio: (projectId: string, data: { title: string; status: EpisodeStatus; script?: string }) =>
@@ -113,12 +116,26 @@ export const api = {
   atualizarEpisodio: (episodeId: string, data: Partial<{ title: string; status: EpisodeStatus; script: string }>) =>
     request<Episode>(`/api/episodios/${episodeId}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  elenco: (projectId: string) => request<CastMember[]>(`/api/projetos/${projectId}/elenco`),
+  exportarRoteiro: (episodeId: string) => `${BASE}/api/episodios/${episodeId}/exportar`,
+
+  elenco: (projectId: string, search?: string) =>
+    request<CastMember[]>(
+      search ? `/api/projetos/${projectId}/elenco?search=${encodeURIComponent(search)}` : `/api/projetos/${projectId}/elenco`,
+    ),
 
   escalar: (projectId: string, data: { dubberId: string; characterName: string; roleNote?: string }) =>
     request<{ id: string }>(`/api/projetos/${projectId}/elenco`, { method: 'POST', body: JSON.stringify(data) }),
 
   removerEscalacao: (castId: string) => request<{ ok: boolean }>(`/api/elenco/${castId}`, { method: 'DELETE' }),
+
+  meuRoteiro: (projectId: string, dubberId: string) =>
+    request<MyScript>(`/api/projetos/${projectId}/meu-roteiro/${dubberId}`),
+
+  // ---- dashboard / backup ----
+  dashboard: () =>
+    request<{ projects: number; episodes: number; activeDubbers: number; pendingSamples: number }>('/api/dashboard'),
+
+  backup: () => request<unknown>('/api/backup'),
 
   // ---- falas do roteiro ----
   falas: (episodeId: string) => request<EpisodeLine[]>(`/api/episodios/${episodeId}/falas`),
@@ -165,6 +182,15 @@ export const api = {
   fichaPublica: (slug: string) => request<PublicDubber>(`/api/publico/dubladores/${slug}`),
 
   audioPublico: (sampleId: string) => `${BASE}/api/publico/audio/${sampleId}`,
+
+  // ---- discografia / perfil do dublador ----
+  discordLink: (dubberId: string) => request<{ discordTag?: string | null }>(`/api/fichas/${dubberId}/discord`),
+
+  salvarDiscord: (dubberId: string, discordTag: string) =>
+    request<{ discordTag: string | null }>(`/api/fichas/${dubberId}/discord`, {
+      method: 'PATCH',
+      body: JSON.stringify({ discordTag }),
+    }),
 };
 
 // ---- tipos espelhados do pacote compartilhado ----
@@ -354,4 +380,37 @@ export interface PublicDubber {
   interests: string[];
   wantedCharacters?: string | null;
   samples: { id: string; fileName: string; sizeBytes: number; label?: string | null }[];
+}
+
+// ---- discord do dublador ----
+export interface DiscordLink {
+  discordTag?: string | null;
+}
+
+// ---- backup ----
+export interface BackupData {
+  exportedAt: string;
+  dubbers: unknown[];
+  projects: unknown[];
+  episodes: unknown[];
+  lines: unknown[];
+}
+
+// ---- página de gravação do dublador ----
+export interface MyScriptLine {
+  characterName: string;
+  lineNumber: number;
+  text: string;
+  context?: string | null;
+  recordingStatus: RecordingState;
+}
+
+export interface MyScript {
+  characters: string[];
+  episodes: {
+    episodeId: string;
+    episodeTitle: string;
+    episodeStatus: EpisodeStatus;
+    lines: MyScriptLine[];
+  }[];
 }

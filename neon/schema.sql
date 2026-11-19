@@ -199,6 +199,9 @@ ALTER TABLE dubbers ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT 
 ALTER TABLE dubbers ADD COLUMN IF NOT EXISTS public_slug TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS dubbers_public_slug_idx ON dubbers(public_slug) WHERE public_slug IS NOT NULL;
 
+-- 16) Tag do Discord para contato direto com o dublador
+ALTER TABLE dubbers ADD COLUMN IF NOT EXISTS discord_tag TEXT;
+
 -- 16) Aprovação de amostras de voz
 ALTER TABLE samples ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'pendente';
 ALTER TABLE samples ADD COLUMN IF NOT EXISTS review_note TEXT;

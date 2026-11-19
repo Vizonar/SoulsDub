@@ -5,6 +5,8 @@ import Fichas from './pages/Fichas';
 import FichaDetalhe from './pages/FichaDetalhe';
 import Projetos from './pages/Projetos';
 import ProjetoDetalhe from './pages/ProjetoDetalhe';
+import Dashboard from './pages/Dashboard';
+import MeuRoteiro from './pages/MeuRoteiro';
 import { DubladorPublico, DubladoresPublicos } from './pages/DubladorPublico';
 
 function Layout() {
@@ -20,6 +22,9 @@ function Layout() {
           </div>
         </div>
         <nav className="nav">
+          <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Visão geral
+          </NavLink>
           <NavLink to="/fichas" className={({ isActive }) => (isActive ? 'active' : '')}>
             Fichas
           </NavLink>
@@ -62,9 +67,11 @@ export default function App() {
             <Route path="/fichas/:id" element={<FichaDetalhe />} />
             <Route path="/projetos" element={<Projetos />} />
             <Route path="/projetos/:id" element={<ProjetoDetalhe />} />
-            <Route path="/" element={<Navigate to="/fichas" replace />} />
+            <Route path="/projetos/:projectId/roteiro/:dubberId" element={<MeuRoteiro />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>
-          <Route path="*" element={<Navigate to="/fichas" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
