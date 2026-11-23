@@ -63,6 +63,13 @@ export type SampleSubmitResult =
   | { status: 'invalid'; errors: string[] };
 
 export type ReviewWithName = Review & { dubberName: string };
+export type DubberFormPatch = Omit<Partial<DubberFormInput>, 'age' | 'pronouns' | 'experience' | 'diction' | 'wantedCharacters'> & {
+  age?: number | null;
+  pronouns?: string | null;
+  experience?: string | null;
+  diction?: string | null;
+  wantedCharacters?: string | null;
+};
 
 export interface DubberRepository {
   readonly kind: 'memory' | 'supabase' | 'neon';
@@ -75,7 +82,7 @@ export interface DubberRepository {
   query(actor: Actor, params: QueryParams): Promise<Page<Dubber>>;
   listAll(actor: Actor): Promise<Dubber[]>;
   getDetails(actor: Actor, id: string): Promise<DubberDetails>;
-  updateDubber(actor: Actor, id: string, patch: Partial<DubberFormInput>): Promise<Dubber>;
+  updateDubber(actor: Actor, id: string, patch: DubberFormPatch): Promise<Dubber>;
   setActive(actor: Actor, id: string, active: boolean): Promise<Dubber>;
   changeClassification(actor: Actor, id: string, next: ClassificationKey, reason: string): Promise<Dubber>;
   addReview(actor: Actor, input: ReviewInput): Promise<Review>;
@@ -252,12 +259,13 @@ export class MemoryRepository implements DubberRepository {
     this.log(actor, 'sample.deleted', (removed as { meta: VoiceSample }).meta.dubberId);
   }
 
-  async updateDubber(actor: Actor, id: string, patch: Partial<DubberFormInput>) {
+  async updateDubber(actor: Actor, id: string, patch: DubberFormPatch) {
     assertCan(actor.role, 'dubber.edit');
     const d = this.find(id);
-    const merged = parseForm({ ...dubberToFormInput(d), ...patch });
+    const normalizedPatch = Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, value === null ? undefined : value]));
+    const merged = parseForm({ ...dubberToFormInput(d), ...normalizedPatch });
     const changed = Object.keys(merged).filter((k) => JSON.stringify(merged[k as keyof DubberForm]) !== JSON.stringify(d[k as keyof Dubber]));
-    Object.assign(d, merged, { updatedAt: this.now() });
+    Object.assign(d, merged, { updatedAt: this.now(), needsReview: true });
     this.log(actor, 'dubber.updated', id, { changed });
     return structuredClone(d);
   }

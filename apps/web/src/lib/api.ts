@@ -63,7 +63,7 @@ export const api = {
 
   ficha: (id: string) => request<DubberDetails>(`/api/fichas/${id}`),
 
-  atualizarFicha: (id: string, patch: Record<string, unknown>) =>
+  atualizarFicha: (id: string, patch: Omit<Partial<Omit<Dubber, 'id' | 'discordId' | 'classification' | 'isActive' | 'needsReview' | 'createdAt' | 'updatedAt'>>, 'age' | 'pronouns' | 'experience' | 'diction' | 'wantedCharacters'> & { age?: number | null; pronouns?: string | null; experience?: string | null; diction?: string | null; wantedCharacters?: string | null }) =>
     request<Dubber>(`/api/fichas/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
 
   classificar: (id: string, classification: string, reason: string) =>

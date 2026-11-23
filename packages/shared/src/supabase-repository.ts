@@ -20,6 +20,7 @@ import {
   dubberToFormInput,
   parseForm,
   type DubberRepository,
+  type DubberFormPatch,
   type ReviewWithName,
   type SampleSubmitResult,
   type SubmitResult,
@@ -321,11 +322,12 @@ export class SupabaseRepository implements DubberRepository {
     await this.db.storage.from(SAMPLE_BUCKET).remove([data.storage_path as string]);
   }
 
-  async updateDubber(actor: Actor, id: string, patch: Partial<DubberFormInput>) {
+  async updateDubber(actor: Actor, id: string, patch: Partial<DubberFormInput> & { age?: number | null; pronouns?: string | null; experience?: string | null; diction?: string | null; wantedCharacters?: string | null }) {
     assertCan(actor.role, 'dubber.edit');
     const current = await this.fetchOne(id);
-    const merged = parseForm({ ...dubberToFormInput(current), ...patch });
-    const { data, error } = await this.db.from('dubbers').update(formToRow(merged)).eq('id', id).select('*').single();
+    const normalizedPatch = Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, value === null ? undefined : value]));
+    const merged = parseForm({ ...dubberToFormInput(current), ...normalizedPatch });
+    const { data, error } = await this.db.from('dubbers').update({ ...formToRow(merged), needs_review: true }).eq('id', id).select('*').single();
     if (error) fail(error);
     return rowToDubber(data);
   }

@@ -140,8 +140,10 @@ describe('permissões administrativas', () => {
   it('admin edita ficha com validação e registra auditoria sem tocar na classificação', async () => {
     const repo = createDemoRepository(NOW);
     const d = (await repo.listAll(DEMO_ADMIN)).find((x) => x.classification === 'avancado')!;
-    const updated = await repo.updateDubber(DEMO_ADMIN, d.id, { displayName: 'Nome Corrigido', specialties: ['Dublagem Épica'] });
-    expect(updated).toMatchObject({ displayName: 'Nome Corrigido', specialties: ['dublagem épica'], classification: 'avancado' });
+    const updated = await repo.updateDubber(DEMO_ADMIN, d.id, { displayName: 'Nome Corrigido', specialties: ['Dublagem Épica'], age: null, pronouns: null });
+    expect(updated).toMatchObject({ displayName: 'Nome Corrigido', specialties: ['dublagem épica'], classification: 'avancado', needsReview: true });
+    expect(updated.age).toBeUndefined();
+    expect(updated.pronouns).toBeUndefined();
     await expect(repo.updateDubber(DEMO_ADMIN, d.id, { displayName: '' })).rejects.toBeInstanceOf(ValidationError);
     const audit = await repo.listAudit(DEMO_ADMIN);
     expect(audit.find((a) => a.action === 'dubber.updated')?.details).toMatchObject({ changed: expect.arrayContaining(['displayName']) });

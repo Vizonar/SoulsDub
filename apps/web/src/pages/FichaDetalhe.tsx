@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type DubberDetails, type ReviewStatus, type SampleWithReview } from '../lib/api';
+import { api, type Dubber, type DubberDetails, type ReviewStatus, type SampleWithReview } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 const CLASSIFICATIONS = ['novato', 'aprendiz', 'intermediario', 'avancado', 'elite'] as const;
@@ -46,6 +46,9 @@ export default function FichaDetalhe() {
   const [publicacao, setPublicacao] = useState<{ is_public: boolean; public_slug: string | null }>({ is_public: false, public_slug: null });
   const [slug, setSlug] = useState('');
   const [discordTag, setDiscordTag] = useState('');
+  const [editandoFicha, setEditandoFicha] = useState(false);
+  const [rascunho, setRascunho] = useState<Partial<Dubber>>({});
+  const [salvo, setSalvo] = useState(false);
 
   const load = () =>
     api
@@ -127,6 +130,45 @@ export default function FichaDetalhe() {
     }
   }
 
+  function iniciarEdicao() {
+    if (!data) return;
+    setRascunho({ ...data.dubber });
+    setEditandoFicha(true);
+    setSalvo(false);
+  }
+
+  async function salvarEdicao() {
+    if (!data) return;
+    setBusy(true);
+    setError('');
+    setSalvo(false);
+    try {
+      await api.atualizarFicha(id, {
+        displayName: rascunho.displayName,
+        age: rascunho.age ?? null,
+        pronouns: rascunho.pronouns ?? null,
+        selfLevel: rascunho.selfLevel,
+        experience: rascunho.experience ?? null,
+        voiceTone: rascunho.voiceTone,
+        voiceTypes: rascunho.voiceTypes,
+        intensity: rascunho.intensity,
+        diction: rascunho.diction ?? null,
+        speechSpeed: rascunho.speechSpeed,
+        specialties: rascunho.specialties,
+        availability: rascunho.availability,
+        interests: rascunho.interests,
+        wantedCharacters: rascunho.wantedCharacters ?? null,
+      });
+      await load();
+      setEditandoFicha(false);
+      setSalvo(true);
+    } catch (e: unknown) {
+      setError(errorText(e, 'Erro ao salvar alterações da ficha'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function classificar(next: string) {
     const reason = window.prompt(`Motivo da mudança para ${next.toUpperCase()}:`);
     if (!reason) return;
@@ -195,10 +237,13 @@ export default function FichaDetalhe() {
           </Link>
           <h2>{d.displayName}</h2>
           <p className="muted small">
-            Classificação: <strong>{d.classification}</strong> · Discord: {d.discordId}
+            Classificação: <strong>{d.classification}</strong> · Discord ID: {d.discordId} · Atualizada: {new Date(d.updatedAt).toLocaleString('pt-BR')}
           </p>
         </div>
-        <div className="row gap">
+        <div className="row gap wrap">
+          {user?.role === 'admin' && !editandoFicha && (
+            <button className="btn primary" onClick={iniciarEdicao} disabled={busy}>Editar ficha</button>
+          )}
           <button className="btn ghost" onClick={toggleAtivo} disabled={busy}>
             {d.isActive ? 'Desativar' : 'Ativar'}
           </button>
@@ -216,26 +261,52 @@ export default function FichaDetalhe() {
       </header>
 
       {error && <p className="error">{error}</p>}
+      {salvo && <p className="success">Ficha atualizada com sucesso. A alteração foi registrada no histórico.</p>}
+
+      {editandoFicha && user?.role === 'admin' && (
+        <section className="card stack">
+          <h3>Corrigir informações da ficha</h3>
+          <p className="muted small">Edite os dados que a pessoa informou incorretamente. O Discord ID e a classificação oficial são alterados em seções próprias.</p>
+          <label className="field">Nome ou nick<input value={rascunho.displayName ?? ''} maxLength={64} onChange={(e) => setRascunho({ ...rascunho, displayName: e.target.value })} /></label>
+          <div className="form-grid">
+            <label className="field">Idade<input type="number" min="1" max="120" value={rascunho.age ?? ''} onChange={(e) => setRascunho({ ...rascunho, age: e.target.value ? Number(e.target.value) : undefined })} /></label>
+            <label className="field">Pronomes<input maxLength={40} value={rascunho.pronouns ?? ''} onChange={(e) => setRascunho({ ...rascunho, pronouns: e.target.value })} /></label>
+            <label className="field">Nível autodeclarado<select className="select" value={rascunho.selfLevel ?? ''} onChange={(e) => setRascunho({ ...rascunho, selfLevel: e.target.value })}><option value="iniciante">Iniciante</option><option value="intermediario">Intermediário</option><option value="avancado">Avançado</option><option value="profissional">Profissional</option></select></label>
+            <label className="field">Tom de voz<select className="select" value={rascunho.voiceTone ?? ''} onChange={(e) => setRascunho({ ...rascunho, voiceTone: e.target.value })}><option value="grave">Grave</option><option value="medio">Médio</option><option value="agudo">Agudo</option><option value="variavel">Variável</option></select></label>
+            <label className="field">Intensidade<select className="select" value={rascunho.intensity ?? ''} onChange={(e) => setRascunho({ ...rascunho, intensity: e.target.value })}><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></label>
+            <label className="field">Velocidade de fala<select className="select" value={rascunho.speechSpeed ?? ''} onChange={(e) => setRascunho({ ...rascunho, speechSpeed: e.target.value })}><option value="lenta">Lenta</option><option value="moderada">Moderada</option><option value="rapida">Rápida</option></select></label>
+          </div>
+          <fieldset className="edit-fieldset"><legend>Tipos de voz (selecione todos que se aplicam)</legend><div className="choice-grid">{([['masculina', 'Masculina'], ['feminina', 'Feminina'], ['neutra', 'Neutra'], ['infantil', 'Infantil'], ['adolescente', 'Adolescente'], ['adulta', 'Adulta']] as const).map(([value, label]) => <label key={value}><input type="checkbox" checked={(rascunho.voiceTypes ?? []).includes(value)} onChange={(e) => setRascunho({ ...rascunho, voiceTypes: e.target.checked ? [...(rascunho.voiceTypes ?? []), value] : (rascunho.voiceTypes ?? []).filter((v) => v !== value) })} /> {label}</label>)}</div></fieldset>
+          <label className="field">Dicção<input maxLength={500} value={rascunho.diction ?? ''} onChange={(e) => setRascunho({ ...rascunho, diction: e.target.value })} /></label>
+          <label className="field">Experiência<textarea rows={4} maxLength={2000} value={rascunho.experience ?? ''} onChange={(e) => setRascunho({ ...rascunho, experience: e.target.value })} /></label>
+          <label className="field">Especialidades (uma por linha)<textarea rows={3} value={(rascunho.specialties ?? []).join('\\n')} onChange={(e) => setRascunho({ ...rascunho, specialties: e.target.value.split('\\n').map((x) => x.trim()).filter(Boolean) })} /></label>
+          <label className="field">Disponibilidade (uma por linha)<textarea rows={3} value={(rascunho.availability ?? []).join('\\n')} onChange={(e) => setRascunho({ ...rascunho, availability: e.target.value.split('\\n').map((x) => x.trim()).filter(Boolean) })} /></label>
+          <label className="field">Projetos de interesse (um por linha)<textarea rows={3} value={(rascunho.interests ?? []).join('\\n')} onChange={(e) => setRascunho({ ...rascunho, interests: e.target.value.split('\\n').map((x) => x.trim()).filter(Boolean) })} /></label>
+          <label className="field">Personagens que gostaria de interpretar<textarea rows={3} maxLength={2000} value={rascunho.wantedCharacters ?? ''} onChange={(e) => setRascunho({ ...rascunho, wantedCharacters: e.target.value })} /></label>
+          <div className="row gap"><button className="btn primary" disabled={busy || !(rascunho.voiceTypes?.length)} onClick={() => void salvarEdicao()}>{busy ? 'Salvando…' : 'Salvar correções'}</button><button className="btn ghost" disabled={busy} onClick={() => setEditandoFicha(false)}>Cancelar</button></div>
+        </section>
+      )}
 
       <section className="card stack">
-        <h3>Perfil</h3>
+        <h3>Informações do formulário</h3>
         <dl className="kv">
-          <dt>Nível</dt>
-          <dd>{d.selfLevel}</dd>
-          <dt>Tom de voz</dt>
-          <dd>{d.voiceTone}</dd>
-          <dt>Tipos de voz</dt>
-          <dd>{d.voiceTypes.join(', ') || '—'}</dd>
-          <dt>Intensidade</dt>
-          <dd>{d.intensity}</dd>
-          <dt>Velocidade</dt>
-          <dd>{d.speechSpeed}</dd>
-          <dt>Disponibilidade</dt>
-          <dd>{d.availability.join(', ') || '—'}</dd>
-          <dt>Interesses</dt>
-          <dd>{d.interests.join(', ') || '—'}</dd>
-          <dt>Personagens</dt>
-          <dd>{d.wantedCharacters || '—'}</dd>
+          <dt>Nome / nick</dt><dd>{d.displayName || '—'}</dd>
+          <dt>Idade</dt><dd>{d.age ?? '—'}</dd>
+          <dt>Pronomes</dt><dd>{d.pronouns || '—'}</dd>
+          <dt>Nível autodeclarado</dt><dd>{d.selfLevel || '—'}</dd>
+          <dt>Experiência</dt><dd className="preserve-lines">{d.experience || '—'}</dd>
+          <dt>Tom de voz</dt><dd>{d.voiceTone || '—'}</dd>
+          <dt>Tipos de voz</dt><dd>{d.voiceTypes.join(', ') || '—'}</dd>
+          <dt>Intensidade</dt><dd>{d.intensity || '—'}</dd>
+          <dt>Dicção</dt><dd className="preserve-lines">{d.diction || '—'}</dd>
+          <dt>Velocidade de fala</dt><dd>{d.speechSpeed || '—'}</dd>
+          <dt>Especialidades</dt><dd>{d.specialties.join(', ') || '—'}</dd>
+          <dt>Disponibilidade</dt><dd>{d.availability.join(', ') || '—'}</dd>
+          <dt>Projetos de interesse</dt><dd>{d.interests.join(', ') || '—'}</dd>
+          <dt>Personagens desejados</dt><dd className="preserve-lines">{d.wantedCharacters || '—'}</dd>
+          <dt>Discord ID</dt><dd>{d.discordId}</dd>
+          <dt>Cadastro criado</dt><dd>{new Date(d.createdAt).toLocaleString('pt-BR')}</dd>
+          <dt>Última atualização</dt><dd>{new Date(d.updatedAt).toLocaleString('pt-BR')}</dd>
         </dl>
       </section>
 

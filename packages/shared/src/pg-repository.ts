@@ -13,7 +13,7 @@ import {
   type ReviewInput,
 } from './schemas.js';
 import { MAX_SAMPLES_PER_DUBBER, validateAudioFile, type AudioFileInput } from './samples.js';
-import { DEFAULT_SUBMIT_RULES, NotFoundError, ValidationError, type DubberRepository, type ReviewWithName, type SampleSubmitResult, type SubmitResult, type SubmitRules } from './repository.js';
+import { DEFAULT_SUBMIT_RULES, NotFoundError, ValidationError, type DubberRepository, type DubberFormPatch, type ReviewWithName, type SampleSubmitResult, type SubmitResult, type SubmitRules } from './repository.js';
 import type {
   Actor,
   AuditLogEntry,
@@ -235,35 +235,36 @@ export class PgRepository implements DubberRepository {
     };
   }
 
-  async updateDubber(actor: Actor, id: string, patch: Partial<DubberFormInput>): Promise<Dubber> {
+  async updateDubber(actor: Actor, id: string, patch: DubberFormPatch): Promise<Dubber> {
     assertCan(actor.role, 'dubber.edit');
     const row = await this.findRow(id);
     const current = rowToDubber(row);
     const { dubberFormSchema } = await import('./schemas.js');
     const merged = dubberFormSchema.safeParse({
       displayName: patch.displayName ?? current.displayName,
-      age: patch.age ?? current.age,
-      pronouns: patch.pronouns ?? current.pronouns,
+      age: patch.age === null ? undefined : patch.age ?? current.age,
+      pronouns: patch.pronouns === null ? undefined : patch.pronouns ?? current.pronouns,
       selfLevel: patch.selfLevel ?? current.selfLevel,
-      experience: patch.experience ?? current.experience,
+      experience: patch.experience === null ? undefined : patch.experience ?? current.experience,
       voiceTone: patch.voiceTone ?? current.voiceTone,
       voiceTypes: patch.voiceTypes ?? current.voiceTypes,
       intensity: patch.intensity ?? current.intensity,
-      diction: patch.diction ?? current.diction,
+      diction: patch.diction === null ? undefined : patch.diction ?? current.diction,
       speechSpeed: patch.speechSpeed ?? current.speechSpeed,
       specialties: patch.specialties ?? current.specialties,
       availability: patch.availability ?? current.availability,
       interests: patch.interests ?? current.interests,
-      wantedCharacters: patch.wantedCharacters ?? current.wantedCharacters,
+      wantedCharacters: patch.wantedCharacters === null ? undefined : patch.wantedCharacters ?? current.wantedCharacters,
     });
     if (!merged.success) throw ValidationError.from(merged.error as any);
     const { cols, vals } = formValues(merged.data as DubberForm);
     const sets = cols.map((c, i) => `${c} = $${i + 1}`).join(', ');
     const { rows } = await this.pool.query(
-      `UPDATE dubbers SET ${sets}, updated_at = now() WHERE id = $${cols.length + 1} RETURNING *`,
+      `UPDATE dubbers SET ${sets}, needs_review = true, updated_at = now() WHERE id = $${cols.length + 1} RETURNING *`,
       [...vals, id],
     );
-    await this.log(actor, 'dubber.updated', id);
+    const changed = Object.keys(patch);
+    await this.log(actor, 'dubber.updated', id, { changed });
     return rowToDubber(rows[0]);
   }
 
