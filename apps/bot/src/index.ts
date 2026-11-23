@@ -43,7 +43,7 @@ async function main() {
     await startServer({
       repo,
       databaseUrl: config.databaseUrl,
-      origin: (process.env.WEB_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+      origin: config.webOrigins,
     });
   }
   await client.login(config.token);

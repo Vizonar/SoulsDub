@@ -11,6 +11,7 @@ const schema = z.object({
   DISCORD_RECRUITMENT_CHANNEL_ID: z.string().optional(),
   DISCORD_ADMIN_ROLE_IDS: z.string().optional(),
   DATABASE_URL: z.string().optional(),
+  WEB_ORIGIN: z.string().optional(),
   BOT_STORAGE: z.enum(['neon', 'memory']).default('neon'),
   FORM_REQUIRE_AGE: bool(false),
   FORM_ALLOW_UPDATES: bool(true),
@@ -25,6 +26,7 @@ export interface BotConfig {
   adminRoleIds: string[];
   storage: 'neon' | 'memory';
   databaseUrl?: string;
+  webOrigins: string[];
   policy: FormPolicy;
   rules: SubmitRules;
 }
@@ -51,6 +53,10 @@ export function loadConfig(env: Record<string, string | undefined>, need: { disc
     adminRoleIds: (e.DISCORD_ADMIN_ROLE_IDS ?? '').split(',').map((x) => x.trim()).filter(Boolean),
     storage: e.BOT_STORAGE,
     databaseUrl: clean(e.DATABASE_URL),
+    webOrigins: (e.WEB_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean).map((s) => {
+      if (/^https?:\/\//i.test(s)) return s.replace(/\/$/, '');
+      return `https://${s.replace(/\/$/, '')}`;
+    }),
     policy: { requireAge: e.FORM_REQUIRE_AGE },
     rules: { allowUpdates: e.FORM_ALLOW_UPDATES, updateCooldownHours: e.FORM_UPDATE_COOLDOWN_HOURS },
   };

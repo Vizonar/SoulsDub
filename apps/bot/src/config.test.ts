@@ -12,6 +12,10 @@ describe('configuração', () => {
     expect(loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', BOT_STORAGE: 'memory' }, { discord: true }).token).toBe('t');
     expect(loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DATABASE_URL: 'postgres://db' }, { discord: true }).storage).toBe('neon');
   });
+  it('normaliza WEB_ORIGIN sem esquema e aceita múltiplas origens', () => {
+    const c = loadConfig({ WEB_ORIGIN: 'voxtrupe-jgrm-green.vercel.app, https://preview.voxtrupe.app/' });
+    expect(c.webOrigins).toEqual(['https://voxtrupe-jgrm-green.vercel.app', 'https://preview.voxtrupe.app']);
+  });
   it('interpreta regras do formulário e cargos de administrador', () => {
     const c = loadConfig({ FORM_REQUIRE_AGE: 'true', FORM_ALLOW_UPDATES: 'false', FORM_UPDATE_COOLDOWN_HOURS: '12', DISCORD_ADMIN_ROLE_IDS: ' 1, 2 ,' });
     expect(c.policy.requireAge).toBe(true);
