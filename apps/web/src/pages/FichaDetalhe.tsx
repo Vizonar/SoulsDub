@@ -196,6 +196,19 @@ export default function FichaDetalhe() {
     }
   }
 
+  async function marcarRevisadoFicha() {
+    if (!data) return;
+    setBusy(true);
+    try {
+      await api.marcarRevisado(id);
+      await load();
+    } catch (e: unknown) {
+      setError(errorText(e, 'Erro'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function enviarNota() {
     if (!nota.trim()) return;
     setBusy(true);
@@ -243,6 +256,11 @@ export default function FichaDetalhe() {
         <div className="row gap wrap">
           {user?.role === 'admin' && !editandoFicha && (
             <button className="btn primary" onClick={iniciarEdicao} disabled={busy}>Editar ficha</button>
+          )}
+          {user?.role === 'admin' || user?.role === 'reviewer' && (
+            <button className="btn ghost small" onClick={marcarRevisadoFicha} disabled={busy || !d.needsReview}>
+              Marcar revisado
+            </button>
           )}
           <button className="btn ghost" onClick={toggleAtivo} disabled={busy}>
             {d.isActive ? 'Desativar' : 'Ativar'}
@@ -351,7 +369,7 @@ export default function FichaDetalhe() {
 
       <section className="card stack">
         <h3>Aprovação das amostras</h3>
-        {!amostras.length && <p className="muted small">Nenhuma amostra para avaliar.</p>}
+        {!amostras.length && <p className="muted small">Sem amostra: esta ficha ainda não recebeu áudio.</p>}
         {amostras.map((s) => (
           <div key={s.id} className="stack">
             <div className="row space wrap gap">
@@ -359,27 +377,30 @@ export default function FichaDetalhe() {
                 <strong>{s.label || s.file_name}</strong> ({kb(s.size_bytes)})
               </span>
               <div className="row gap">
-                <button
-                  className="btn ghost small"
-                  disabled={busy || s.review_status === 'aprovada'}
-                  onClick={() => void avaliar(s.id, 'aprovada')}
-                >
-                  Aprovar
-                </button>
-                <button
-                  className="btn ghost small"
-                  disabled={busy || s.review_status === 'recusada'}
-                  onClick={() => void avaliar(s.id, 'recusada')}
-                >
-                  Recusar
-                </button>
+                <span className="small">
+                  Status: {s.review_status}
+                  {s.reviewed_by ? ` · por ${s.reviewed_by}` : ''}
+                  {s.review_note ? ` · ${s.review_note}` : ''}
+                </span>
+                {s.review_status === 'pendente' && <span className="chip warn">Amostra não revisada</span>}
               </div>
             </div>
-            <span className="muted tiny">
-              Status: {s.review_status}
-              {s.reviewed_by ? ` · por ${s.reviewed_by}` : ''}
-              {s.review_note ? ` · ${s.review_note}` : ''}
-            </span>
+            <div className="row gap">
+              <button
+                className="btn ghost small"
+                disabled={busy || s.review_status === 'aprovada'}
+                onClick={() => void avaliar(s.id, 'aprovada')}
+              >
+                Aprovar
+              </button>
+              <button
+                className="btn ghost small"
+                disabled={busy || s.review_status === 'recusada'}
+                onClick={() => void avaliar(s.id, 'recusada')}
+              >
+                Recusar
+              </button>
+            </div>
           </div>
         ))}
       </section>

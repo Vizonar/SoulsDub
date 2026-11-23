@@ -74,7 +74,6 @@ export const api = {
 
   adicionarNota: (id: string, body: string) =>
     request<unknown>(`/api/fichas/${id}/notas`, { method: 'POST', body: JSON.stringify({ body }) }),
-
   marcarRevisado: (id: string) => request<Dubber>(`/api/fichas/${id}/revisado`, { method: 'POST' }),
 
   enviarSample: (id: string, fileName: string, mimeType: string, base64: string, label?: string) =>
