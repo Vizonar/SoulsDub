@@ -140,9 +140,15 @@ export function createServer({ repo, databaseUrl, origin }: ServerOptions) {
   };
 
   // ---------- saúde ----------
-  app.get('/api/health', wrap(async (_req, res) => {
+  // Liveness probe must not wait for Neon; Render can detect the open HTTP port promptly.
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, app: 'Vox Trupe Studios', db: 'neon' });
+  });
+
+  // Readiness check verifies the database separately from process liveness.
+  app.get('/api/ready', wrap(async (_req, res) => {
     const { rows } = await pool.query<{ now: Date }>('SELECT now() AS now');
-    res.json({ ok: true, app: 'Vox Trupe Studios', db: 'neon', now: rows[0]?.now });
+    res.json({ ok: true, db: 'neon', now: rows[0]?.now });
   }));
 
   // ---------- auth ----------

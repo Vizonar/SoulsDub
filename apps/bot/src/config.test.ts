@@ -13,7 +13,7 @@ describe('configuração', () => {
     expect(loadConfig({ DISCORD_TOKEN: 't', DISCORD_CLIENT_ID: 'c', DATABASE_URL: 'postgres://db' }, { discord: true }).storage).toBe('neon');
   });
   it('normaliza WEB_ORIGIN sem esquema e aceita múltiplas origens', () => {
-    const c = loadConfig({ WEB_ORIGIN: 'voxtrupe-jgrm-green.vercel.app, https://preview.voxtrupe.app/' });
+    const c = loadConfig({ WEB_ORIGIN: 'https://voxtrupe-jgrm-green.vercel.app, https://preview.voxtrupe.app/' });
     expect(c.webOrigins).toEqual(['https://voxtrupe-jgrm-green.vercel.app', 'https://preview.voxtrupe.app']);
   });
   it('interpreta regras do formulário e cargos de administrador', () => {
