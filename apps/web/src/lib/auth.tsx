@@ -24,7 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (alive) setUser(r.user);
       })
       .catch((e: unknown) => {
-        if (e instanceof ApiError && e.status === 401) tokenStore.clear();
+        // Sem sessão válida, nunca mantenha a aplicação presa no estado de carregamento.
+        tokenStore.clear();
+        if (!(e instanceof ApiError && e.status === 401)) {
+          console.error('Não foi possível validar a sessão:', e);
+        }
       })
       .finally(() => {
         if (alive) setLoading(false);

@@ -20,6 +20,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = tokenStore.get();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    signal: init.signal ?? AbortSignal.timeout(6_000),
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
